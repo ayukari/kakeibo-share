@@ -41,7 +41,7 @@ Project Settings → API の **Project URL** と **anon public** キーだけを
 
 ## 実施状況（2026-10-28）
 - プロジェクト `kakeibo-share`（リージョン ap-northeast-2 ソウル）を社長が作成。
-- マイグレーション 4 本を SQL Editor で適用済み（表 13・関数 45・履歴のトリガー 9・登録時のプロフィール作成のトリガー）。適用後に確認した結果:
+- マイグレーション 5 本（4 本 + 貯金 20261029000500_savings.sql。貯金は 2026-10-29 に適用し、表 2・関数 8・ポリシー 2・履歴のトリガー 2 を確認。内部関数は authenticated から実行不可、anon は実行不可）を SQL Editor で適用済み（表 13・関数 45・履歴のトリガー 9・登録時のプロフィール作成のトリガー）。適用後に確認した結果:
   - 内部用の関数（`_` で始まるもの）は authenticated から実行できない。
   - ログインなし（anon）では、表の読み取りも `create_group` も権限エラー（42501）になる。
 - 接続先（URL と anon の鍵）は `android/local.properties` と `ios/Config/Secrets.xcconfig` に入れた（どちらも git に入らない）。service_role の鍵は使っていない。
