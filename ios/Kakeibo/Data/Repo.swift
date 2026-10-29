@@ -164,6 +164,33 @@ final class Repo: @unchecked Sendable {
     func deleteRecurring(_ id: String) async throws { try await rpcVoid("delete_recurring", ["p_id": .string(id)]) }
     @discardableResult func generateDue(_ g: String) async throws -> Int { try await rpc("generate_due_recurring", ["p_group": .string(g)]) }
 
+    // ---------- 貯金 ----------
+    func goals(_ g: String) async throws -> [SavingsGoal] {
+        try await call { try await client.from("savings_goals").select().eq("group_id", value: g).is("archived_at", value: nil).order("created_at", ascending: true).execute().value }
+    }
+    func saveGoal(_ g: String, goal: SavingsGoal?, name: String, target: Int64, dueMonth: Date?, isMain: Bool, autoAmount: Int64?, autoDom: Int?, startOn: Date, isPrivate: Bool) async throws {
+        var p: [String: AnyJSON] = [
+            "name": .string(name.trimmingCharacters(in: .whitespaces)), "target": .integer(Int(target)),
+            "due_month": dueMonth.map { .string(Money.dateString(Money.monthStart($0))) } ?? .null, "is_main": .bool(isMain),
+            "auto_amount": autoAmount.map { .integer(Int($0)) } ?? .null, "auto_dom": i(autoDom),
+            "start_on": .string(Money.dateString(startOn)), "visibility": .string(isPrivate ? "private" : "group"),
+        ]
+        if let goal { p["id"] = .string(goal.id); p["version"] = .integer(goal.version) }
+        try await rpcVoid("save_goal", ["p_group": .string(g), "p": .object(p)])
+    }
+    func archiveGoal(_ id: String) async throws { try await rpcVoid("archive_goal", ["p_id": .string(id)]) }
+    func recordSaving(goal: String, day: Date, amount: Int64, kind: String, memo: String, requestId: String) async throws {
+        try await rpcVoid("record_saving", ["p_goal": .string(goal), "p_day": .string(Money.dateString(day)), "p_amount": .integer(Int(amount)),
+                                            "p_kind": .string(kind), "p_memo": .string(memo), "p_client_request_id": .string(requestId)])
+    }
+    func deleteSaving(_ id: String) async throws { try await rpcVoid("delete_saving", ["p_id": .string(id)]) }
+    @discardableResult func generateDueSavings(_ g: String) async throws -> Int { try await rpc("generate_due_savings", ["p_group": .string(g)]) }
+    func savingsStatus(_ g: String) async throws -> [SavingsStatus] { try await rpc("savings_status", ["p_group": .string(g)]) }
+    func passbook(_ g: String, goal: String? = nil) async throws -> [PassbookRow] { try await rpc("savings_passbook", ["p_group": .string(g), "p_goal": s(goal)]) }
+    func savingsSeries(_ g: String, end: Date, months: Int = 12) async throws -> [SavingsPoint] {
+        try await rpc("savings_series", ["p_group": .string(g), "p_end_month": month(end), "p_months": .integer(months)])
+    }
+
     // ---------- 操作の履歴 ----------
     func audit(_ g: String, limit: Int = 200) async throws -> [AuditLog] { try await call { try await client.from("audit_logs").select().eq("group_id", value: g).order("at", ascending: false).limit(limit).execute().value } }
 }

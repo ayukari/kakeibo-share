@@ -50,6 +50,7 @@ struct MainTabView: View {
                 TabView {
                     nav { DashboardView(ctx: ctx, month: $month) }.tabItem { Label("ホーム", systemImage: "house") }
                     nav { TxnListView(ctx: ctx, month: $month) }.tabItem { Label("収支", systemImage: "list.bullet") }
+                    nav { SavingsView(ctx: ctx) }.tabItem { Label("貯金", systemImage: "envelope") }
                     nav { SettlementView(ctx: ctx) }.tabItem { Label("精算", systemImage: "arrow.left.arrow.right") }
                     nav { ReportView(ctx: ctx, month: $month) }.tabItem { Label("レポート", systemImage: "chart.bar") }
                     nav { MoreView(ctx: ctx, month: month) }.tabItem { Label("その他", systemImage: "ellipsis") }
@@ -83,7 +84,7 @@ struct MainTabView: View {
 }
 
 // ---------- ホーム（かざすレシートの家計簿のホームと同じ並び: 今月の支出 → 予算とペース → カテゴリ → 最近の記録） ----------
-struct DashData { let sum: MonthSummary; let budgets: [BudgetStatus]; let txns: [Txn]; let prev: [Txn]; let balances: [Balance] }
+struct DashData { let sum: MonthSummary; let budgets: [BudgetStatus]; let txns: [Txn]; let prev: [Txn]; let balances: [Balance]; var savings: SavingsHome? = nil }
 
 struct DashboardView: View {
     let ctx: GroupCtx
@@ -107,7 +108,8 @@ struct DashboardView: View {
             let prev = Money.addMonths(month, -1)
             state = .ready(DashData(sum: try await ctx.repo.monthSummary(ctx.g, month), budgets: try await ctx.repo.budgetStatus(ctx.g, month),
                                     txns: try await ctx.repo.transactions(ctx.g, from: month, toExclusive: Money.addMonths(month, 1)),
-                                    prev: try await ctx.repo.transactions(ctx.g, from: prev, toExclusive: month), balances: try await ctx.repo.balances(ctx.g)))
+                                    prev: try await ctx.repo.transactions(ctx.g, from: prev, toExclusive: month), balances: try await ctx.repo.balances(ctx.g),
+                                    savings: try? await SavingsHome.load(ctx)))
         } catch { state = .failed(Repo.map(error)) }
     }
 }
@@ -131,6 +133,7 @@ struct DashboardContent: View {
                 }
             }
             BudgetPaper(ctx: ctx, d: d, month: month, isCur: isCur)
+            if isCur, let sv = d.savings { SavingsCard(ctx: ctx, h: sv) { ctx.refresh += 1 } }
             if let mine = d.balances.first(where: { $0.memberId == ctx.me?.id }), d.balances.count > 1 {
                 Text(mine.net > 0 ? "あなたは \(Money.format(mine.net)) 受け取る側です" : mine.net < 0 ? "あなたは \(Money.format(-mine.net)) 払う側です" : "あなたの精算は済んでいます")
                     .font(.system(size: 14)).foregroundStyle(Color.kInk).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.kBg, in: paperShape)

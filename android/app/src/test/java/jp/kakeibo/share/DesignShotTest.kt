@@ -81,7 +81,7 @@ class DesignShotTest {
             listOf(BudgetStatus("b1", "group", "c1", null, 40000, 19500, 20500, 0.4875, false), BudgetStatus("b2", "group", "c2", null, 5000, 4400, 600, 0.88, false), BudgetStatus("b3", "group", "c4", null, 2000, 2300, -300, 1.15, true)),
             txns, prevTx, listOf(Balance("m1", "あき", "active", 10000, 5000, 0, 0, 5000), Balance("m2", "はる", "active", 0, 5000, 0, 0, -5000)),
         )
-        shot("home") { DashboardContent(c, d, month, true) {} }
+        shot("home") { DashboardContent(c, d, month, true, {}) }
     }
 
     @Test fun calendar() {
@@ -89,5 +89,21 @@ class DesignShotTest {
         val t = listOf(1 to 80000L, 2 to 3200L, 4 to 1800L, 6 to 5400L, 9 to 2300L, 12 to 4100L, 15 to 6800L, 20 to 2600L, 26 to 12000L).map { (d, a) -> txn("c$d", d, "c1", a, month = month) } +
             txn("inc", 25, "c5", 280000, kind = "income", month = month)
         shot("calendar") { Column { CalendarSection(c, month, t, 12, {}, {}) } }
+    }
+
+    @Test fun savings() {
+        val c = ctx(); val today = Money.todayJst(); val m = "%04d-%02d".format(today.year, today.monthValue)
+        val g1 = SavingsGoal("g1", "g", "沖縄旅行", 200000, dueMonth = today.withDayOfMonth(1).plusMonths(8).toString(), isMain = true, startOn = "2026-04-01", createdBy = "u1")
+        val g2 = SavingsGoal("g2", "g", "もしものとき", 300000, autoAmount = 10000, autoDom = 25, startOn = "2026-04-01", createdBy = "u1")
+        val pb = listOf(
+            PassbookRow("p1", "g1", "沖縄旅行", "2026-05-03", 30000, "manual", balance = 30000), PassbookRow("p2", "g2", "もしものとき", "2026-05-25", 10000, "auto", "先取り貯金", 40000),
+            PassbookRow("p3", "g1", "沖縄旅行", "2026-06-10", 20000, "manual", balance = 60000), PassbookRow("p4", "g2", "もしものとき", "2026-06-25", 10000, "auto", "先取り貯金", 70000),
+            PassbookRow("p5", "g1", "沖縄旅行", "2026-07-02", -5000, "manual", "引き出し", 65000), PassbookRow("p6", "g1", "沖縄旅行", "${m}-02", 4500, "tsumori", "コンビニのコーヒー", 69500),
+            PassbookRow("p7", "g1", "沖縄旅行", "${m}-05", 6000, "leftover", "2026-09", 75500),
+        )
+        val st = listOf(SavingsStatus("g1", 55500, 144500, 0.2775, false, 9, 16056, false, null, 10500), SavingsStatus("g2", 20000, 280000, 0.0667, false, null, null, false, null, 0))
+        val ser = (11 downTo 0).map { k -> val d = today.withDayOfMonth(1).minusMonths(k.toLong()); SavingsPoint(d.toString(), if (k % 3 == 0) 0 else 10000L + k * 1500, if (k == 3) 5000 else 0) }
+        val d = SavingsData(listOf(g1, g2), st, pb, ser, 280000, listOf(120000, 98000, 110000))
+        shot("savings") { SavingsContent(c, d, today, {}, {}, null, {}, 20) {} }
     }
 }

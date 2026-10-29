@@ -7,6 +7,8 @@ import jp.kakeibo.share.domain.ErrorKind
 import jp.kakeibo.share.domain.Money
 import jp.kakeibo.share.domain.Validate
 import jp.kakeibo.share.domain.Insights
+import jp.kakeibo.share.domain.Savings
+import jp.kakeibo.share.data.*
 import jp.kakeibo.share.ui.Csv
 import java.time.YearMonth
 import kotlinx.serialization.json.*
@@ -123,5 +125,34 @@ class DomainTest {
     @Test fun calendarStepsAndShortAmounts() {
         assertEquals(0, Insights.step(0, 100)); assertEquals(1, Insights.step(25, 100)); assertEquals(2, Insights.step(26, 100)); assertEquals(3, Insights.step(75, 100)); assertEquals(4, Insights.step(76, 100))
         assertEquals("3,200", Insights.short(3200)); assertEquals("80k", Insights.short(80000)); assertEquals("12k", Insights.short(12400))
+    }
+
+    @Test fun savingsPaceWords() {
+        val g = SavingsGoal("g", "g", "旅行", 120000, dueMonth = "2027-09-01", startOn = "2026-10-01", autoAmount = 5000, autoDom = 25)
+        fun st(done: Boolean = false, over: Boolean = false, per: Long? = null, on: Boolean? = null) = SavingsStatus("g", 29000, 91000, 0.24, done, 12, per, over, on, 0)
+        assertEquals("目標に届きました。", Savings.pace(g, st(done = true)))
+        assertEquals("期限（2027年9月）をすぎています。", Savings.pace(g, st(over = true)))
+        assertEquals("2027年9月までに毎月 ¥7,584・先取りでは ¥2,584 足りません", Savings.pace(g, st(per = 7584, on = false)))
+        assertEquals("2027年9月までに毎月 ¥4,000・先取りで届きます", Savings.pace(g, st(per = 4000, on = true)))
+        assertEquals("あと ¥91,000・毎月25日に ¥5,000 先取り", Savings.pace(g.copy(dueMonth = null), st()))
+        assertEquals("月末", Savings.domLabel(99))
+    }
+
+    @Test fun savingsMilestoneAndEmergency() {
+        fun r(day: String, a: Long) = PassbookRow(day + a, "g", "x", day, a, "manual", balance = 0)
+        val m = Savings.milestone(100000, listOf(r("2026-09-01", 30000), r("2026-10-05", 25000)), java.time.LocalDate.of(2026, 10, 29))!!
+        assertEquals(50, m.pct); assertTrue(m.thisMonth); assertEquals("今月、半分まで来ました（50%）。", m.text)
+        assertNull(Savings.milestone(100000, listOf(r("2026-10-01", 1000)), java.time.LocalDate.of(2026, 10, 29)))
+        assertEquals(100, Savings.milestone(1000, listOf(r("2026-09-01", 1200)), java.time.LocalDate.of(2026, 10, 29))!!.pct)
+        assertEquals(110000L to 330000L, Savings.emergencyTarget(listOf(0, 100000, 120000, 110000)))
+        assertEquals(97000L to 300000L, Savings.emergencyTarget(listOf(97000)))
+        assertNull(Savings.emergencyTarget(listOf(0, 0)))
+    }
+
+    @Test fun savingsLeftover() {
+        fun b(cat: String?, amount: Long, spent: Long) = BudgetStatus("b", "group", cat, null, amount, spent, amount - spent, spent.toDouble() / amount, spent > amount)
+        assertEquals(6000L, Savings.leftover(listOf(b("c1", 40000, 36000), b("c2", 5000, 3000), b(null, 99999, 0))))
+        assertNull(Savings.leftover(listOf(b("c1", 10000, 12000))))
+        assertNull(Savings.leftover(emptyList()))
     }
 }

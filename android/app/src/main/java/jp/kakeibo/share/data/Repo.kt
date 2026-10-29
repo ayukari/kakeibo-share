@@ -171,6 +171,29 @@ class Repo(val client: SupabaseClient) {
     suspend fun deleteRecurring(id: String) = rpcUnit("delete_recurring", buildJsonObject { put("p_id", id) })
     suspend fun generateDue(g: String): Int = rpc("generate_due_recurring", buildJsonObject { put("p_group", g) })
 
+    // ---------- 貯金 ----------
+    suspend fun goals(g: String): List<SavingsGoal> = call {
+        client.from("savings_goals").select { filter { eq("group_id", g); exact("archived_at", null) }; order("created_at", Order.ASCENDING) }.decodeList<SavingsGoal>()
+    }
+    suspend fun saveGoal(g: String, goal: SavingsGoal?, name: String, target: Long, dueMonth: LocalDate?, isMain: Boolean, autoAmount: Long?, autoDom: Int?, startOn: LocalDate, private: Boolean): SavingsGoal =
+        rpc("save_goal", buildJsonObject {
+            put("p_group", g)
+            put("p", buildJsonObject {
+                goal?.let { put("id", it.id); put("version", it.version) }
+                put("name", name.trim()); put("target", target); put("due_month", dueMonth?.withDayOfMonth(1)?.toString()); put("is_main", isMain)
+                put("auto_amount", autoAmount); put("auto_dom", autoDom); put("start_on", startOn.toString()); put("visibility", if (private) "private" else "group")
+            })
+        })
+    suspend fun archiveGoal(id: String) = rpcUnit("archive_goal", buildJsonObject { put("p_id", id) })
+    suspend fun recordSaving(goal: String, day: LocalDate, amount: Long, kind: String, memo: String, requestId: String): JsonObject =
+        rpc("record_saving", buildJsonObject { put("p_goal", goal); put("p_day", day.toString()); put("p_amount", amount); put("p_kind", kind); put("p_memo", memo); put("p_client_request_id", requestId) })
+    suspend fun deleteSaving(id: String) = rpcUnit("delete_saving", buildJsonObject { put("p_id", id) })
+    suspend fun generateDueSavings(g: String): Int = rpc("generate_due_savings", buildJsonObject { put("p_group", g) })
+    suspend fun savingsStatus(g: String): List<SavingsStatus> = rpcList("savings_status", buildJsonObject { put("p_group", g) })
+    suspend fun passbook(g: String, goal: String? = null): List<PassbookRow> = rpcList("savings_passbook", buildJsonObject { put("p_group", g); put("p_goal", goal) })
+    suspend fun savingsSeries(g: String, end: LocalDate, months: Int = 12): List<SavingsPoint> =
+        rpcList("savings_series", buildJsonObject { put("p_group", g); put("p_end_month", end.withDayOfMonth(1).toString()); put("p_months", months) })
+
     // ---------- 操作履歴 ----------
     suspend fun audit(g: String, limit: Long = 200): List<AuditLog> = call {
         client.from("audit_logs").select { filter { eq("group_id", g) }; order("at", Order.DESCENDING); limit(limit) }.decodeList<AuditLog>()

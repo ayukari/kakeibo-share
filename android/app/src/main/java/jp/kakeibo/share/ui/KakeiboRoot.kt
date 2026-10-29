@@ -61,7 +61,7 @@ class AppVM(val repo: Repo, private val ctx: Context) : ViewModel() {
             val ms = repo.members(g.id)
             members.value = ms
             me.value = ms.firstOrNull { it.userId == repo.userId() && it.status == "active" }
-            if (me.value?.role != "viewer") runCatching { repo.generateDue(g.id) }   // 期日の来た定期取引を作る（何度呼んでも二重にならない）
+            if (me.value?.role != "viewer") { runCatching { repo.generateDue(g.id) }; runCatching { repo.generateDueSavings(g.id) } }   // 期日の来た定期取引と先取り貯金を作る（何度呼んでも二重にならない）
         } catch (_: AppError) { }
     }
 

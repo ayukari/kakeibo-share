@@ -177,3 +177,47 @@ data class TxnInput(
     val equalMembers: List<String> = emptyList(),
     val customShares: Map<String, Long> = emptyMap(),
 )
+
+// ---------- 貯金（目標＝封筒・記録＝通帳） ----------
+@Serializable data class SavingsGoal(
+    val id: String,
+    @SerialName("group_id") val groupId: String,
+    val name: String,
+    val target: Long,
+    @SerialName("due_month") val dueMonth: String? = null,
+    @SerialName("is_main") val isMain: Boolean = false,
+    @SerialName("auto_amount") val autoAmount: Long? = null,
+    @SerialName("auto_dom") val autoDom: Int? = null,
+    @SerialName("start_on") val startOn: String,
+    val visibility: String = "group",
+    @SerialName("created_by") val createdBy: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    val version: Int = 1,
+)
+
+@Serializable data class SavingsStatus(
+    @SerialName("goal_id") val goalId: String,
+    val saved: Long,
+    val remaining: Long,
+    val ratio: Double,
+    val done: Boolean,
+    @SerialName("months_left") val monthsLeft: Int? = null,
+    @SerialName("per_month") val perMonth: Long? = null,
+    val overdue: Boolean = false,
+    @SerialName("on_track") val onTrack: Boolean? = null,
+    @SerialName("this_month") val thisMonth: Long = 0,
+)
+
+@Serializable data class PassbookRow(
+    val id: String,
+    @SerialName("goal_id") val goalId: String,
+    @SerialName("goal_name") val goalName: String,
+    val day: String,
+    val amount: Long,
+    val kind: String,
+    val memo: String = "",
+    val balance: Long,
+    @SerialName("created_by") val createdBy: String? = null,
+)
+
+@Serializable data class SavingsPoint(val month: String, val deposit: Long, val withdrawal: Long)

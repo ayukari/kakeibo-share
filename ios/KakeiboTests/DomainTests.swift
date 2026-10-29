@@ -125,4 +125,39 @@ final class DomainTests: XCTestCase {
         XCTAssertEqual(Insights.short(80000), "80k")
         XCTAssertEqual(Insights.short(12400), "12k")
     }
+
+    func testSavingsPaceWords() {
+        let g = SavingsGoal(id: "g", groupId: "g", name: "旅行", target: 120000, dueMonth: "2027-09-01", autoAmount: 5000, autoDom: 25, startOn: "2026-10-01")
+        func st(done: Bool = false, over: Bool = false, per: Int64? = nil, on: Bool? = nil) -> SavingsStatus {
+            SavingsStatus(goalId: "g", saved: 29000, remaining: 91000, ratio: 0.24, done: done, monthsLeft: 12, perMonth: per, overdue: over, onTrack: on, thisMonth: 0)
+        }
+        XCTAssertEqual(Savings.pace(g, st(done: true)), "目標に届きました。")
+        XCTAssertEqual(Savings.pace(g, st(over: true)), "期限（2027年9月）をすぎています。")
+        XCTAssertEqual(Savings.pace(g, st(per: 7584, on: false)), "2027年9月までに毎月 ¥7,584・先取りでは ¥2,584 足りません")
+        XCTAssertEqual(Savings.pace(g, st(per: 4000, on: true)), "2027年9月までに毎月 ¥4,000・先取りで届きます")
+        var g2 = g; g2.dueMonth = nil
+        XCTAssertEqual(Savings.pace(g2, st()), "あと ¥91,000・毎月25日に ¥5,000 先取り")
+        XCTAssertEqual(Savings.domLabel(99), "月末")
+    }
+
+    func testSavingsMilestoneAndEmergency() {
+        func r(_ day: String, _ a: Int64) -> PassbookRow { PassbookRow(id: day + String(a), goalId: "g", goalName: "x", day: day, amount: a, kind: "manual", balance: 0) }
+        let today = Money.date("2026-10-29")!
+        let m = Savings.milestone(target: 100000, rows: [r("2026-09-01", 30000), r("2026-10-05", 25000)], today: today)!
+        XCTAssertEqual(m.pct, 50); XCTAssertTrue(m.thisMonth); XCTAssertEqual(m.text, "今月、半分まで来ました（50%）。")
+        XCTAssertNil(Savings.milestone(target: 100000, rows: [r("2026-10-01", 1000)], today: today))
+        XCTAssertEqual(Savings.milestone(target: 1000, rows: [r("2026-09-01", 1200)], today: today)?.pct, 100)
+        XCTAssertEqual(Savings.emergencyTarget([0, 100000, 120000, 110000])?.target, 330000)
+        XCTAssertEqual(Savings.emergencyTarget([97000])?.target, 300000)
+        XCTAssertNil(Savings.emergencyTarget([0, 0]))
+    }
+
+    func testSavingsLeftover() {
+        func b(_ cat: String?, _ amount: Int64, _ spent: Int64) -> BudgetStatus {
+            BudgetStatus(budgetId: "b", scope: "group", categoryId: cat, memberId: nil, amount: amount, spent: spent, remaining: amount - spent, ratio: Double(spent) / Double(amount), over: spent > amount)
+        }
+        XCTAssertEqual(Savings.leftover([b("c1", 40000, 36000), b("c2", 5000, 3000), b(nil, 99999, 0)]), 6000)
+        XCTAssertNil(Savings.leftover([b("c1", 10000, 12000)]))
+        XCTAssertNil(Savings.leftover([]))
+    }
 }

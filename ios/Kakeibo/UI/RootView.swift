@@ -56,7 +56,7 @@ final class AppState {
         do {
             members = try await repo.members(g.id)
             me = members.first { $0.userId?.lowercased() == repo.userId && $0.status == "active" }
-            if me?.role != "viewer" { try? await repo.generateDue(g.id) }   // 期日の来た定期取引を作る（何度呼んでも二重にならない）
+            if me?.role != "viewer" { try? await repo.generateDue(g.id); try? await repo.generateDueSavings(g.id) }   // 期日の来た定期取引と先取り貯金を作る（何度呼んでも二重にならない）
         } catch {}
     }
 

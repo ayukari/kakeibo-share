@@ -227,3 +227,57 @@ struct TxnInput {
     var equalMembers: [String] = []
     var customShares: [String: Int64] = [:]
 }
+
+// ---------- 貯金（目標＝封筒・記録＝通帳） ----------
+struct SavingsGoal: Codable, Identifiable, Hashable {
+    let id: String
+    let groupId: String
+    let name: String
+    let target: Int64
+    var dueMonth: String? = nil
+    var isMain: Bool = false
+    var autoAmount: Int64? = nil
+    var autoDom: Int? = nil
+    let startOn: String
+    var visibility: String = "group"
+    var createdBy: String? = nil
+    var createdAt: String? = nil
+    var version: Int = 1
+    enum CodingKeys: String, CodingKey {
+        case id, name, target, visibility, version
+        case groupId = "group_id", dueMonth = "due_month", isMain = "is_main", autoAmount = "auto_amount", autoDom = "auto_dom"
+        case startOn = "start_on", createdBy = "created_by", createdAt = "created_at"
+    }
+}
+
+struct SavingsStatus: Codable, Hashable {
+    let goalId: String
+    let saved: Int64
+    let remaining: Int64
+    let ratio: Double
+    let done: Bool
+    var monthsLeft: Int? = nil
+    var perMonth: Int64? = nil
+    var overdue: Bool = false
+    var onTrack: Bool? = nil
+    var thisMonth: Int64 = 0
+    enum CodingKeys: String, CodingKey {
+        case saved, remaining, ratio, done, overdue
+        case goalId = "goal_id", monthsLeft = "months_left", perMonth = "per_month", onTrack = "on_track", thisMonth = "this_month"
+    }
+}
+
+struct PassbookRow: Codable, Identifiable, Hashable {
+    let id: String
+    let goalId: String
+    let goalName: String
+    let day: String
+    let amount: Int64
+    let kind: String
+    var memo: String = ""
+    var balance: Int64
+    var createdBy: String? = nil
+    enum CodingKeys: String, CodingKey { case id, day, amount, kind, memo, balance, goalId = "goal_id", goalName = "goal_name", createdBy = "created_by" }
+}
+
+struct SavingsPoint: Codable, Hashable { let month: String; let deposit: Int64; let withdrawal: Int64 }

@@ -196,7 +196,7 @@ fun Chevron(left: Boolean, color: Color = T.ink) {
 }
 
 // 下の切り替えの線のアイコン（絵文字は使わない）
-enum class Glyph { Home, List, Swap, Chart, More }
+enum class Glyph { Home, List, Save, Swap, Chart, More }
 
 @Composable
 fun LineIcon(g: Glyph, color: Color, size: Dp = 22.dp) {
@@ -207,6 +207,7 @@ fun LineIcon(g: Glyph, color: Color, size: Dp = 22.dp) {
         val p = Path()
         when (g) {
             Glyph.Home -> { p.moveTo(4 * u, 11 * u); p.lineTo(12 * u, 4 * u); p.lineTo(20 * u, 11 * u); p.lineTo(20 * u, 19 * u); p.lineTo(15 * u, 19 * u); p.lineTo(15 * u, 13 * u); p.lineTo(9 * u, 13 * u); p.lineTo(9 * u, 19 * u); p.lineTo(4 * u, 19 * u); p.close() }
+            Glyph.Save -> { p.moveTo(5 * u, 9 * u); p.lineTo(19 * u, 9 * u); p.lineTo(19 * u, 19 * u); p.lineTo(5 * u, 19 * u); p.close(); p.moveTo(5 * u, 9 * u); p.lineTo(12 * u, 14 * u); p.lineTo(19 * u, 9 * u); p.moveTo(9 * u, 5.5f * u); p.lineTo(15 * u, 5.5f * u) }
             Glyph.List -> { for (y in listOf(7f, 12f, 17f)) { p.moveTo(8 * u, y * u); p.lineTo(20 * u, y * u); p.moveTo(4 * u, y * u); p.lineTo(4.5f * u, y * u) } }
             Glyph.Swap -> { p.moveTo(5 * u, 9 * u); p.lineTo(19 * u, 9 * u); p.moveTo(15 * u, 5 * u); p.lineTo(19 * u, 9 * u); p.lineTo(15 * u, 13 * u); p.moveTo(19 * u, 16 * u); p.lineTo(5 * u, 16 * u); p.moveTo(9 * u, 12 * u); p.lineTo(5 * u, 16 * u); p.lineTo(9 * u, 20 * u) }
             Glyph.Chart -> { p.moveTo(4 * u, 20 * u); p.lineTo(20 * u, 20 * u); p.moveTo(7 * u, 16 * u); p.lineTo(7 * u, 11 * u); p.moveTo(12 * u, 16 * u); p.lineTo(12 * u, 6 * u); p.moveTo(17 * u, 16 * u); p.lineTo(17 * u, 8 * u) }

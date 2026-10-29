@@ -54,9 +54,10 @@ sealed interface Sub {
     data object Audit : Sub
     data object Account : Sub
     data object Export : Sub
+    data class Goal(val goal: SavingsGoal?, val presetName: String? = null, val presetTarget: Long? = null) : Sub
 }
 
-private enum class Tab(val label: String, val glyph: Glyph) { Home("ホーム", Glyph.Home), Txns("収支", Glyph.List), Settle("精算", Glyph.Swap), Report("レポート", Glyph.Chart), More("その他", Glyph.More) }
+private enum class Tab(val label: String, val glyph: Glyph) { Home("ホーム", Glyph.Home), Txns("収支", Glyph.List), Save("貯金", Glyph.Save), Settle("精算", Glyph.Swap), Report("レポート", Glyph.Chart), More("その他", Glyph.More) }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,6 +97,7 @@ fun MainScaffold(app: AppVM, g: Group) {
                     Sub.Audit -> AuditScreen(ctx)
                     Sub.Account -> AccountScreen(ctx, onLeft = { pop(); app.select(null); app.loadGroups() })
                     Sub.Export -> ExportScreen(ctx)
+                    is Sub.Goal -> GoalScreen(ctx, sub.goal, sub.presetName, sub.presetTarget) { msg -> toast(msg); refresh++; pop() }
                 }
             }
         }
@@ -118,7 +120,8 @@ fun MainScaffold(app: AppVM, g: Group) {
         Box(Modifier.padding(pad).fillMaxSize()) {
             key(refresh) {
                 when (tab) {
-                    Tab.Home -> DashboardScreen(ctx, month, { month = it }, open = push)
+                    Tab.Home -> DashboardScreen(ctx, month, { month = it }, open = push, goSave = { tab = Tab.Save }, onChanged = { msg -> toast(msg); refresh++ })
+                    Tab.Save -> SavingsScreen(ctx, push)
                     Tab.Txns -> TxnListScreen(ctx, month, { month = it }, open = push)
                     Tab.Settle -> SettlementScreen(ctx)
                     Tab.Report -> ReportScreen(ctx, month, { month = it })
@@ -154,17 +157,18 @@ private fun subTitle(s: Sub) = when (s) {
     is Sub.EditTxn -> if (s.txn == null) "記録する" else "取引の編集"
     Sub.Budgets -> "予算"; Sub.Categories -> "カテゴリ"; Sub.Members -> "メンバーと招待"; Sub.Recurring -> "定期的な収支"
     Sub.Audit -> "操作の履歴"; Sub.Account -> "アカウントと設定"; Sub.Export -> "書き出しとバックアップ"
+    is Sub.Goal -> if (s.goal == null) "貯金の目標を作る" else "貯金の目標を直す"
 }
 
 // ---------- ホーム（かざすレシートの家計簿のホームと同じ並び: 今月の支出 → 予算とペース → カテゴリ → 最近の記録） ----------
-data class Dash(val sum: MonthSummary, val budgets: List<BudgetStatus>, val txns: List<Txn>, val prev: List<Txn>, val balances: List<Balance>)
+data class Dash(val sum: MonthSummary, val budgets: List<BudgetStatus>, val txns: List<Txn>, val prev: List<Txn>, val balances: List<Balance>, val savings: SavingsHome? = null)
 
 @Composable
-fun DashboardScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit, open: (Sub) -> Unit) {
+fun DashboardScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit, open: (Sub) -> Unit, goSave: () -> Unit = {}, onChanged: (String) -> Unit = {}) {
     val vm: LoadVM<Dash> = viewModel(key = "dash-${ctx.g.id}-$month") {
         LoadVM {
             Dash(ctx.repo.monthSummary(ctx.g.id, month), ctx.repo.budgetStatus(ctx.g.id, month), ctx.repo.transactions(ctx.g.id, month, month.plusMonths(1)),
-                ctx.repo.transactions(ctx.g.id, month.minusMonths(1), month), ctx.repo.balances(ctx.g.id))
+                ctx.repo.transactions(ctx.g.id, month.minusMonths(1), month), ctx.repo.balances(ctx.g.id), runCatching { loadSavingsHome(ctx) }.getOrNull())
         }
     }
     val st by vm.state.collectAsState()
@@ -173,14 +177,27 @@ fun DashboardScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Un
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 112.dp)) {
         item { MonthBar(month, setMonth) }
         item {
-            LoadableView(st, { vm.reload() }) { d -> DashboardContent(ctx, d, month, isCur, open) }
+            LoadableView(st, { vm.reload() }) { d -> DashboardContent(ctx, d, month, isCur, open, goSave, onChanged) }
         }
     }
 }
 
 // ホームの中身（読み込んだデータから描く。画面のテストからも使う）
+// ホームの貯金のカードに要るもの（いちばん大事な目標・先月の予算の余り）
+suspend fun loadSavingsHome(ctx: GroupCtx): SavingsHome {
+    val today = Money.todayJst()
+    val goals = ctx.repo.goals(ctx.g.id)
+    val status = ctx.repo.savingsStatus(ctx.g.id)
+    val main = goals.firstOrNull { it.isMain && it.visibility == "group" } ?: goals.firstOrNull { g -> status.firstOrNull { it.goalId == g.id }?.done == false } ?: goals.firstOrNull()
+    val prev = today.withDayOfMonth(1).minusMonths(1)
+    val prevKey = "%04d-%02d".format(prev.year, prev.monthValue)
+    val left = if (goals.isEmpty()) null else jp.kakeibo.share.domain.Savings.leftover(ctx.repo.budgetStatus(ctx.g.id, prev))
+    val done = left != null && ctx.repo.passbook(ctx.g.id).any { it.kind == "leftover" && it.memo == prevKey }
+    return SavingsHome(main, status.firstOrNull { it.goalId == main?.id }, (goals.size - 1).coerceAtLeast(0), left, prevKey, done)
+}
+
 @Composable
-fun DashboardContent(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean, open: (Sub) -> Unit) {
+fun DashboardContent(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean, open: (Sub) -> Unit, goSave: () -> Unit = {}, onChanged: (String) -> Unit = {}) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Spacer(Modifier.height(0.dp))
                     Paper {
@@ -194,6 +211,7 @@ fun DashboardContent(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean, o
                         }
                     }
                     BudgetPaper(ctx, d, month, isCur, open)
+                    if (isCur && d.savings != null) SavingsCard(ctx, d.savings, goSave, onChanged)
                     val mine = d.balances.firstOrNull { it.memberId == ctx.me?.id }
                     if (mine != null && d.balances.size > 1) {
                         Row(Modifier.fillMaxWidth().clip(PaperShape).background(T.bg).padding(12.dp, 12.dp)) {
