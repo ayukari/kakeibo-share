@@ -37,7 +37,7 @@ import java.util.UUID
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TxnListScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit, open: (Sub) -> Unit) {
-    val vm: LoadVM<List<Txn>> = viewModel(key = "txns-${ctx.g.id}-$month") { LoadVM { ctx.repo.transactions(ctx.g.id, month, month.plusMonths(1)) } }
+    val vm: LoadVM<List<Txn>> = viewModel(key = "txns-${ctx.g.id}-r${ctx.rev}-$month") { LoadVM { ctx.repo.transactions(ctx.g.id, month, month.plusMonths(1)) } }
     val st by vm.state.collectAsState()
     var mode by remember { mutableIntStateOf(0) }   // 0 = リスト、1 = カレンダー
     var kind by remember { mutableStateOf("all") }

@@ -47,7 +47,7 @@ data class SaveIntent(val goalId: String?, val kind: String, val dir: Int)
 @Composable
 fun SavingsScreen(ctx: GroupCtx, open: (Sub) -> Unit) {
     val today = Money.todayJst()
-    val vm: LoadVM<SavingsData> = viewModel(key = "save-${ctx.g.id}") {
+    val vm: LoadVM<SavingsData> = viewModel(key = "save-${ctx.g.id}-r${ctx.rev}") {
         LoadVM {
             SavingsData(ctx.repo.goals(ctx.g.id), ctx.repo.savingsStatus(ctx.g.id), ctx.repo.passbook(ctx.g.id), ctx.repo.savingsSeries(ctx.g.id, today),
                 ctx.repo.monthSummary(ctx.g.id, today).income, ctx.repo.monthlySeries(ctx.g.id, today.minusMonths(1), 6).map { it.expense })
@@ -302,7 +302,7 @@ fun GoalScreen(ctx: GroupCtx, goal: SavingsGoal?, presetName: String?, presetTar
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var askArchive by remember { mutableStateOf(false) }
-    val rowsVm: LoadVM<List<PassbookRow>>? = goal?.let { g -> viewModel(key = "goalrows-${g.id}") { LoadVM { ctx.repo.passbook(ctx.g.id, g.id) } } }
+    val rowsVm: LoadVM<List<PassbookRow>>? = goal?.let { g -> viewModel(key = "goalrows-${g.id}-r${ctx.rev}") { LoadVM { ctx.repo.passbook(ctx.g.id, g.id) } } }
     val canEdit = goal == null || ctx.can("admin") || goal.createdBy == ctx.repo.userId()
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {

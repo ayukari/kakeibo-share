@@ -34,7 +34,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 // 開いているグループの共通情報（メンバー・カテゴリ・支払い方法）
-class GroupCtx(val app: AppVM, val g: Group, val me: Member?, val members: List<Member>, val cats: List<Category>, val pms: List<PaymentMethod>, val reloadMeta: () -> Unit) {
+class GroupCtx(val app: AppVM, val g: Group, val me: Member?, val members: List<Member>, val cats: List<Category>, val pms: List<PaymentMethod>, val rev: Int = 0, val reloadMeta: () -> Unit) {
     val repo get() = app.repo
     fun can(min: String) = roleRank(me?.role) >= roleRank(min)
     fun memberName(id: String?) = members.firstOrNull { it.id == id }?.let { if (it.status == "active") it.displayName else "${it.displayName}（退出）" } ?: "不明"
@@ -74,7 +74,7 @@ fun MainScaffold(app: AppVM, g: Group) {
 
     val m = meta
     if (m !is Loadable.Ready) { Column(Modifier.fillMaxSize().padding(top = 48.dp)) { LoadableView(m, { metaVm.reload() }) {} }; return }
-    val ctx = GroupCtx(app, g, me, members, m.value.cats, m.value.pms) { metaVm.reload() }
+    val ctx = GroupCtx(app, g, me, members, m.value.cats, m.value.pms, refresh) { metaVm.reload() }
     val push: (Sub) -> Unit = { stack = stack + it }
     val pop: () -> Unit = { stack = stack.dropLast(1) }
     val toast: (String) -> Unit = { msg -> app.toast(msg) }
@@ -165,7 +165,7 @@ data class Dash(val sum: MonthSummary, val budgets: List<BudgetStatus>, val txns
 
 @Composable
 fun DashboardScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit, open: (Sub) -> Unit, goSave: () -> Unit = {}, onChanged: (String) -> Unit = {}) {
-    val vm: LoadVM<Dash> = viewModel(key = "dash-${ctx.g.id}-$month") {
+    val vm: LoadVM<Dash> = viewModel(key = "dash-${ctx.g.id}-r${ctx.rev}-$month") {
         LoadVM {
             Dash(ctx.repo.monthSummary(ctx.g.id, month), ctx.repo.budgetStatus(ctx.g.id, month), ctx.repo.transactions(ctx.g.id, month, month.plusMonths(1)),
                 ctx.repo.transactions(ctx.g.id, month.minusMonths(1), month), ctx.repo.balances(ctx.g.id), runCatching { loadSavingsHome(ctx) }.getOrNull())

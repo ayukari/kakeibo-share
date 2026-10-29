@@ -36,7 +36,7 @@ import java.time.LocalDate
 // ---------- カテゴリ ----------
 @Composable
 fun CategoryScreen(ctx: GroupCtx) {
-    val vm: LoadVM<List<Category>> = viewModel(key = "cats-${ctx.g.id}") { LoadVM { ctx.repo.categories(ctx.g.id) } }
+    val vm: LoadVM<List<Category>> = viewModel(key = "cats-${ctx.g.id}-r${ctx.rev}") { LoadVM { ctx.repo.categories(ctx.g.id) } }
     val st by vm.state.collectAsState()
     val busy by vm.busy.collectAsState()
     val host = remember { SnackbarHostState() }
@@ -106,7 +106,7 @@ data class MemberData(val members: List<Member>, val invites: List<Invitation>)
 @Composable
 fun MemberScreen(ctx: GroupCtx) {
     val admin = ctx.can("admin")
-    val vm: LoadVM<MemberData> = viewModel(key = "members-${ctx.g.id}") {
+    val vm: LoadVM<MemberData> = viewModel(key = "members-${ctx.g.id}-r${ctx.rev}") {
         LoadVM { MemberData(ctx.repo.members(ctx.g.id), if (admin) ctx.repo.invitations(ctx.g.id) else emptyList()) }
     }
     val st by vm.state.collectAsState()
@@ -185,7 +185,7 @@ fun MemberScreen(ctx: GroupCtx) {
 // ---------- 定期的な収支（家賃・サブスクなど。期日が来たら自動で記録。何度動いても二重にならない） ----------
 @Composable
 fun RecurringScreen(ctx: GroupCtx) {
-    val vm: LoadVM<List<Recurring>> = viewModel(key = "rec-${ctx.g.id}") { LoadVM { ctx.repo.recurring(ctx.g.id) } }
+    val vm: LoadVM<List<Recurring>> = viewModel(key = "rec-${ctx.g.id}-r${ctx.rev}") { LoadVM { ctx.repo.recurring(ctx.g.id) } }
     val st by vm.state.collectAsState()
     val busy by vm.busy.collectAsState()
     val host = remember { SnackbarHostState() }
@@ -262,7 +262,7 @@ fun RecurringScreen(ctx: GroupCtx) {
 // ---------- 操作の履歴（管理者以上） ----------
 @Composable
 fun AuditScreen(ctx: GroupCtx) {
-    val vm: LoadVM<List<AuditLog>> = viewModel(key = "audit-${ctx.g.id}") { LoadVM { ctx.repo.audit(ctx.g.id) } }
+    val vm: LoadVM<List<AuditLog>> = viewModel(key = "audit-${ctx.g.id}-r${ctx.rev}") { LoadVM { ctx.repo.audit(ctx.g.id) } }
     val st by vm.state.collectAsState()
     val tables = mapOf("transactions" to "収支", "settlements" to "精算", "group_members" to "メンバー", "invitations" to "招待", "categories" to "カテゴリ", "budgets" to "予算",
         "recurring_transactions" to "定期", "groups" to "グループ", "payment_methods" to "支払い方法", "transaction_splits" to "割り勘")

@@ -27,7 +27,7 @@ data class SettleData(val balances: List<Balance>, val suggestions: List<Suggest
 
 @Composable
 fun SettlementScreen(ctx: GroupCtx) {
-    val vm: LoadVM<SettleData> = viewModel(key = "settle-${ctx.g.id}") {
+    val vm: LoadVM<SettleData> = viewModel(key = "settle-${ctx.g.id}-r${ctx.rev}") {
         LoadVM { SettleData(ctx.repo.balances(ctx.g.id), ctx.repo.suggestions(ctx.g.id), ctx.repo.settlements(ctx.g.id)) }
     }
     val st by vm.state.collectAsState()
@@ -120,7 +120,7 @@ data class ReportData(val series: List<MonthPoint>, val sum: MonthSummary)
 
 @Composable
 fun ReportScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit) {
-    val vm: LoadVM<ReportData> = viewModel(key = "report-${ctx.g.id}-$month") { LoadVM { ReportData(ctx.repo.monthlySeries(ctx.g.id, month, 6), ctx.repo.monthSummary(ctx.g.id, month)) } }
+    val vm: LoadVM<ReportData> = viewModel(key = "report-${ctx.g.id}-r${ctx.rev}-$month") { LoadVM { ReportData(ctx.repo.monthlySeries(ctx.g.id, month, 6), ctx.repo.monthSummary(ctx.g.id, month)) } }
     val st by vm.state.collectAsState()
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
         item { MonthBar(month, setMonth) }
@@ -191,7 +191,7 @@ fun BudgetRow(ctx: GroupCtx, b: BudgetStatus) {
 @Composable
 fun BudgetScreen(ctx: GroupCtx, month: LocalDate) {
     data class B(val status: List<BudgetStatus>, val all: List<Budget>)
-    val vm: LoadVM<B> = viewModel(key = "budget-${ctx.g.id}-$month") { LoadVM { B(ctx.repo.budgetStatus(ctx.g.id, month), ctx.repo.budgets(ctx.g.id)) } }
+    val vm: LoadVM<B> = viewModel(key = "budget-${ctx.g.id}-r${ctx.rev}-$month") { LoadVM { B(ctx.repo.budgetStatus(ctx.g.id, month), ctx.repo.budgets(ctx.g.id)) } }
     val st by vm.state.collectAsState()
     val busy by vm.busy.collectAsState()
     val host = remember { SnackbarHostState() }
