@@ -46,5 +46,6 @@ jobs:
           xcodegen generate
       - name: テスト（シミュレーター）
         run: |
-          set -o pipefail
-          xcodebuild test -project Kakeibo.xcodeproj -scheme Kakeibo -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO | tail -200
+          xcodebuild test -project Kakeibo.xcodeproj -scheme Kakeibo -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || status=$?
+          grep -E "error:|Test Suite|Executed|TEST (SUCCEEDED|FAILED)" build.log | sort -u | head -80
+          exit ${status:-0}

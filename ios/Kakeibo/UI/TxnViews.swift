@@ -170,10 +170,7 @@ struct TxnEditView: View {
         amountError = Validate.amount(amount); error = nil
         let a = Money.parse(amount) ?? 0
         let shares = splitMembers.compactMap { custom[$0.id].flatMap(Money.parse) }
-        let problem = amountError ?? Validate.date(date) ?? (catId == nil ? "カテゴリを選んでください" : nil) ?? (payerId == nil ? "払った人を選んでください" : nil) ?? Validate.memo(memo)
-            ?? (split == "equal" && equal.isEmpty ? "割り勘する人を選んでください" : nil)
-            ?? (split == "custom" ? Validate.customSplit(a, shares) : nil)
-            ?? (splitsLoaded ? nil : "割り勘の内訳を読み込めていません")
+        let problem = firstProblem(a: a, shares: shares)
         if let problem { if problem != amountError { error = problem }; return nil }   // 金額の誤りは入力欄の下に出す
         let mode = (kind == "income" || isPrivate) ? "none" : split
         return TxnInput(id: txn?.id, version: txn?.version, clientRequestId: requestId, kind: kind, amount: a, occurredOn: Money.dateString(date),
@@ -181,6 +178,19 @@ struct TxnEditView: View {
                         visibility: isPrivate ? "private" : "group", splitMode: mode,
                         equalMembers: splitMembers.map(\.id).filter { equal.contains($0) },
                         customShares: custom.compactMapValues { Money.parse($0) }.filter { $0.value > 0 })
+    }
+
+    // 入力の誤りを上から順に調べ、最初の 1 つを返す（金額の誤りは入力欄の下に出す）
+    private func firstProblem(a: Int64, shares: [Int64]) -> String? {
+        if let e = amountError { return e }
+        if let e = Validate.date(date) { return e }
+        if catId == nil { return "カテゴリを選んでください" }
+        if payerId == nil { return "払った人を選んでください" }
+        if let e = Validate.memo(memo) { return e }
+        if split == "equal" && equal.isEmpty { return "割り勘する人を選んでください" }
+        if split == "custom", let e = Validate.customSplit(a, shares) { return e }
+        if !splitsLoaded { return "割り勘の内訳を読み込めていません" }
+        return nil
     }
 
     private func save(_ t: TxnInput) {
