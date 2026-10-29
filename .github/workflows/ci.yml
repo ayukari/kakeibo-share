@@ -46,6 +46,8 @@ jobs:
           xcodegen generate
       - name: テスト（シミュレーター）
         run: |
-          xcodebuild test -project Kakeibo.xcodeproj -scheme Kakeibo -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || status=$?
+          DEST=$(xcrun simctl list devices available | grep -m1 iPhone | grep -oE '[0-9A-F]{8}-([0-9A-F]{4}-){3}[0-9A-F]{12}')
+          echo "シミュレーター: $DEST"
+          xcodebuild test -project Kakeibo.xcodeproj -scheme Kakeibo -destination "id=$DEST" CODE_SIGNING_ALLOWED=NO > build.log 2>&1 || status=$?
           grep -E "error:|Test Suite|Executed|TEST (SUCCEEDED|FAILED)" build.log | sort -u | head -80
           exit ${status:-0}
