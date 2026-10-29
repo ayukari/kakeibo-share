@@ -17,9 +17,9 @@ jobs:
         run: |
           sudo systemctl start postgresql.service
           sudo -u postgres psql -c "alter user postgres password 'postgres'"
-          chmod -R o+rX "$GITHUB_WORKSPACE" "$(dirname "$GITHUB_WORKSPACE")" "$(dirname "$(dirname "$GITHUB_WORKSPACE")")" || true
+          mkdir -p /tmp/kbroot/tests && cp -r tests/vectors /tmp/kbroot/tests/ && chmod -R a+rX /tmp/kbroot
       - name: マイグレーションと DB のテスト
-        env: { PSQL_BIN: psql, PGPORT: "5432", PGPASSWORD: postgres }
+        env: { PSQL_BIN: psql, PGPORT: "5432", PGPASSWORD: postgres, KB_ROOT: /tmp/kbroot }
         run: bash supabase/tests/run.sh
 
   android:
