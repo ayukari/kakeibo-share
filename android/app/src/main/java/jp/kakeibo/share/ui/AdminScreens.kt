@@ -16,6 +16,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -51,13 +55,13 @@ fun CategoryScreen(ctx: GroupCtx) {
                         listOf("expense" to "支出", "income" to "収入").forEach { (k, l) ->
                             SectionTitle(l)
                             cs.filter { it.kind == k && it.archivedAt == null }.forEach { c ->
-                                ListItem(headlineContent = { Text("${c.icon} ${c.name}") }, modifier = Modifier.clickable(enabled = admin) { edit = c },
+                                ListItem(headlineContent = { Text(c.name, fontWeight = FontWeight.Bold) }, leadingContent = { CategoryDot(c.name, c.color) }, modifier = Modifier.clickable(enabled = admin) { edit = c },
                                     trailingContent = { if (admin) TextButton({ del = c }) { Text("消す", color = OverColor) } })
                             }
                             if (admin) TextButton({ creating = k }, enabled = !busy) { Text("＋ ${l}のカテゴリを足す") }
                         }
                         val archived = cs.filter { it.archivedAt != null }
-                        if (archived.isNotEmpty()) { SectionTitle("使われなくなったカテゴリ（過去の記録のために残しています）"); archived.forEach { Text("${it.icon} ${it.name}", color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                        if (archived.isNotEmpty()) { SectionTitle("使われなくなったカテゴリ（過去の記録のために残しています）"); archived.forEach { Text(it.name, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                     }
                 }
             }
@@ -68,17 +72,24 @@ fun CategoryScreen(ctx: GroupCtx) {
     if (target != null || newKind != null) {
         var name by remember(target, newKind) { mutableStateOf(target?.name ?: "") }
         var icon by remember(target, newKind) { mutableStateOf(target?.icon ?: "・") }
+        var color by remember(target, newKind) { mutableStateOf(target?.color ?: "#6b7280") }
         val err = Validate.categoryName(name)
         AlertDialog({ edit = null; creating = null }, title = { Text(if (target == null) "カテゴリを足す" else "カテゴリを直す") }, text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(name, { name = it.take(20) }, label = { Text("名前") }, singleLine = true, isError = err != null && name.isNotEmpty())
-                OutlinedTextField(icon, { icon = it.take(2) }, label = { Text("絵文字（1 文字）") }, singleLine = true)
+                Label("色（点と棒に使います）")
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("#e07a3f", "#3f8fd0", "#7a5cc7", "#e0b23f", "#3fb0b0", "#d04f6a", "#4f9a6a", "#6b7280").forEach { h ->
+                        Box(Modifier.size(32.dp).clip(androidx.compose.foundation.shape.CircleShape).background(parseColor(h)).then(if (color == h) Modifier.border(3.dp, T.ink, androidx.compose.foundation.shape.CircleShape) else Modifier).clickable { color = h })
+                    }
+                }
+                OutlinedTextField(icon, { icon = it.take(2) }, label = { Text("絵文字（1 文字・任意）") }, singleLine = true)
             }
         }, confirmButton = {
             TextButton({
                 val c = target; edit = null; creating = null
                 vm.act("保存しました", onDone = { if (it) ctx.reloadMeta() }) {
-                    ctx.repo.saveCategory(ctx.g.id, c?.id, c?.kind ?: newKind!!, name, c?.color ?: "#6b7280", icon.ifBlank { "・" }, c?.sort ?: 100, c?.version)
+                    ctx.repo.saveCategory(ctx.g.id, c?.id, c?.kind ?: newKind!!, name, color, icon.ifBlank { "・" }, c?.sort ?: 100, c?.version)
                 }
             }, enabled = err == null) { Text("保存") }
         }, dismissButton = { TextButton({ edit = null; creating = null }) { Text("やめる") } })
@@ -213,7 +224,7 @@ fun RecurringScreen(ctx: GroupCtx) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("expense" to "支出", "income" to "収入").forEach { (k, l) -> FilterChip(kind == k, { kind = k; cat = null }, { Text(l) }) } }
                     AmountField(amount, { amount = it })
-                    Picker("カテゴリ", ctx.cats.filter { it.kind == kind && it.archivedAt == null }, cat, { "${it.icon} ${it.name}" }, { cat = it })
+                    Picker("カテゴリ", ctx.cats.filter { it.kind == kind && it.archivedAt == null }, cat, { it.name }, { cat = it })
                     Picker(if (kind == "income") "受け取る人" else "払う人", ctx.activeMembers, payer, { it.displayName }, { payer = it })
                     OutlinedTextField(memo, { memo = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("メモ（例: 家賃）") })
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("weekly" to "毎週", "monthly" to "毎月", "yearly" to "毎年").forEach { (k, l) -> FilterChip(freq == k, { freq = k }, { Text(l) }) } }

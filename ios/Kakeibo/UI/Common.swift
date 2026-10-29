@@ -84,8 +84,8 @@ struct EmptyBox: View {
     let message: String
     var body: some View {
         VStack(spacing: 6) {
-            Text(title).font(.headline)
-            Text(message).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+            Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(Color.kInk)
+            if !message.isEmpty { Text(message).font(.system(size: 14)).foregroundStyle(Color.kSub).multilineTextAlignment(.center) }
         }.frame(maxWidth: .infinity).padding(28)
     }
 }
@@ -107,13 +107,17 @@ struct MonthBar: View {
     @Binding var month: Date
     var body: some View {
         HStack {
-            Button { month = Money.addMonths(month, -1) } label: { Image(systemName: "chevron.left").frame(width: 44, height: 44) }
-                .accessibilityLabel("前の月")
-            Text(Money.monthLabel(month)).font(.headline).frame(maxWidth: .infinity)
-            Button { month = Money.addMonths(month, 1) } label: { Image(systemName: "chevron.right").frame(width: 44, height: 44) }
-                .accessibilityLabel("次の月")
-                .disabled(month >= Money.monthStart(Money.todayJST()))
+            square("前の月", "chevron.left", enabled: true) { month = Money.addMonths(month, -1) }
+            Text(Money.monthLabel(month)).font(.system(size: 16, weight: .bold)).foregroundStyle(Color.kInk).frame(maxWidth: .infinity)
+            square("次の月", "chevron.right", enabled: month < Money.monthStart(Money.todayJST())) { month = Money.addMonths(month, 1) }
         }
+    }
+
+    private func square(_ label: String, _ icon: String, enabled: Bool, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(Color.kInk).frame(width: 44, height: 44)
+                .background(Color.kCard, in: buttonShape).overlay(buttonShape.stroke(Color.kLine, lineWidth: 1))
+        }.buttonStyle(.plain).disabled(!enabled).opacity(enabled ? 1 : 0.3).accessibilityLabel(label)
     }
 }
 
@@ -136,8 +140,8 @@ func roleRank(_ r: String?) -> Int {
 }
 
 extension Color {
-    static let income = Color(red: 0.05, green: 0.46, blue: 0.34)
-    static let over = Color(red: 0.71, green: 0.14, blue: 0.09)
+    static let income = Color.kAccent
+    static let over = Color.kDanger
 }
 
 // 操作の結果を画面の下に少しだけ出す

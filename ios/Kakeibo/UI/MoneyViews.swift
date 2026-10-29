@@ -18,60 +18,70 @@ struct SettlementView: View {
     }
 
     var body: some View {
-        List {
-            LoadableView(state: loader.state, retry: { await loader.reload() }) { d in
-                Section {
-                    ForEach(d.balances, id: \.memberId) { b in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(b.displayName + (b.status != "active" ? "（退出）" : ""))
-                                Text("立て替え \(Money.format(b.paid))・負担 \(Money.format(b.burden))").font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            MoneyText(yen: b.net, signed: true, color: b.net < 0 ? .over : .income)
-                        }.accessibilityElement(children: .combine)
-                    }
-                } header: { Text("いまの差額") } footer: { Text("割り勘にした支出だけで計算します。プラスは受け取る側、マイナスは払う側です。") }
-                Section("精算の提案") {
-                    if d.suggestions.isEmpty { Text("いま精算が必要な人はいません（確認待ちの精算は差し引いています）") }
-                    ForEach(d.suggestions, id: \.self) { s in
-                        HStack {
-                            Text("\(ctx.memberName(s.fromMember)) → \(ctx.memberName(s.toMember))")
-                            Spacer()
-                            MoneyText(yen: s.amount)
-                            if ctx.can("member") { Button("払った") { recordAmount = String(s.amount); recordNote = ""; recordId = UUID().uuidString.lowercased(); record = s }.buttonStyle(.borderless) }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                LoadableView(state: loader.state, retry: { await loader.reload() }) { d in
+                    SubText("割り勘にした支出だけで計算します。プラスは受け取る側、マイナスは払う側です。")
+                    SectionLabel(text: "いまの差額")
+                    ListPaper {
+                        ForEach(Array(d.balances.enumerated()), id: \.element.memberId) { i, b in
+                            if i > 0 { DashedLine() }
+                            ItemRow(title: b.displayName + (b.status != "active" ? "（退出）" : ""), sub: "立て替え \(Money.format(b.paid))・負担 \(Money.format(b.burden))",
+                                    amount: (b.net > 0 ? "+" : "") + Money.format(b.net), catName: b.displayName, catColor: "#6b7280", amountColor: b.net < 0 ? .kDanger : .kInk)
                         }
                     }
-                }
-                let pending = d.history.filter { $0.status == "pending" }
-                if !pending.isEmpty {
-                    Section("確認待ち") {
-                        ForEach(pending) { s in
-                            VStack(alignment: .leading) {
-                                Text("\(ctx.memberName(s.fromMember)) → \(ctx.memberName(s.toMember))  \(Money.format(s.amount))")
+                    SectionLabel(text: "精算の提案")
+                    if d.suggestions.isEmpty { Paper { SubText("いま精算が必要な人はいません（確認待ちの精算は差し引いています）") } }
+                    else {
+                        ListPaper {
+                            ForEach(Array(d.suggestions.enumerated()), id: \.element.id) { i, sg in
+                                if i > 0 { DashedLine() }
                                 HStack {
-                                    // 受け取った人（か管理者）が確認すると差額に入る
-                                    if s.toMember == ctx.me?.id || ctx.can("admin") {
-                                        Button("受け取りを確認") { Task { await loader.act("受け取りを確認しました") { try await ctx.repo.confirmSettlement(s.id) } } }.buttonStyle(.borderless)
+                                    Text("\(ctx.memberName(sg.fromMember)) → \(ctx.memberName(sg.toMember))").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kInk)
+                                    Spacer()
+                                    Text(Money.format(sg.amount)).font(.system(size: 16, weight: .heavy)).monospacedDigit().foregroundStyle(Color.kInk)
+                                    if ctx.can("member") { Button("払った") { recordAmount = String(sg.amount); recordNote = ""; recordId = UUID().uuidString.lowercased(); record = sg }.font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kAccent).frame(minHeight: 44) }
+                                }.padding(.horizontal, 16).padding(.vertical, 4)
+                            }
+                        }
+                    }
+                    let pending = d.history.filter { $0.status == "pending" }
+                    if !pending.isEmpty {
+                        SectionLabel(text: "確認待ち")
+                        ListPaper {
+                            ForEach(Array(pending.enumerated()), id: \.element.id) { i, p in
+                                if i > 0 { DashedLine() }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(ctx.memberName(p.fromMember)) → \(ctx.memberName(p.toMember))  \(Money.format(p.amount))").font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kInk)
+                                    HStack(spacing: 16) {
+                                        // 受け取った人（か管理者）が確認すると差額に入る
+                                        if p.toMember == ctx.me?.id || ctx.can("admin") {
+                                            Button("受け取りを確認") { Task { await loader.act("受け取りを確認しました") { try await ctx.repo.confirmSettlement(p.id) } } }.font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kAccent).frame(minHeight: 44)
+                                        }
+                                        if p.fromMember == ctx.me?.id || p.toMember == ctx.me?.id || ctx.can("admin") {
+                                            Button("取り消す", role: .destructive) { cancel = p }.font(.system(size: 14)).foregroundStyle(Color.kDanger).frame(minHeight: 44)
+                                        }
                                     }
-                                    if s.fromMember == ctx.me?.id || s.toMember == ctx.me?.id || ctx.can("admin") {
-                                        Button("取り消す", role: .destructive) { cancel = s }.buttonStyle(.borderless)
-                                    }
-                                }
+                                }.padding(.horizontal, 16).padding(.vertical, 8)
+                            }
+                        }
+                    }
+                    SectionLabel(text: "精算の履歴")
+                    let done = d.history.filter { $0.status != "pending" }
+                    if done.isEmpty { Paper { SubText("まだありません") } }
+                    else {
+                        ListPaper {
+                            ForEach(Array(done.enumerated()), id: \.element.id) { i, h in
+                                if i > 0 { DashedLine() }
+                                Text("\((h.confirmedAt ?? h.createdAt ?? "").prefix(10))  \(ctx.memberName(h.fromMember)) → \(ctx.memberName(h.toMember))  \(Money.format(h.amount))" + (h.status == "cancelled" ? "（取り消し）" : ""))
+                                    .font(.system(size: 14)).foregroundStyle(Color.kInk).padding(.horizontal, 16).padding(.vertical, 12)
                             }
                         }
                     }
                 }
-                Section("精算の履歴") {
-                    let done = d.history.filter { $0.status != "pending" }
-                    if done.isEmpty { Text("まだありません").foregroundStyle(.secondary) }
-                    ForEach(done) { s in
-                        Text("\((s.confirmedAt ?? s.createdAt ?? "").prefix(10))  \(ctx.memberName(s.fromMember)) → \(ctx.memberName(s.toMember))  \(Money.format(s.amount))" + (s.status == "cancelled" ? "（取り消し）" : ""))
-                            .font(.subheadline)
-                    }
-                }
-            }
+            }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 32)
         }
+        .background(Color.kBg)
         .task(id: ctx.refresh) { await loader.reload() }
         .refreshable { await loader.reload() }
         .toast($loader.message)
@@ -108,53 +118,49 @@ struct ReportView: View {
     @State private var state: Loadable<ReportData> = .loading
 
     var body: some View {
-        List {
-            MonthBar(month: $month)
-            LoadableView(state: state, retry: load) { d in
-                Section("支出の推移（6 か月）") {
-                    // 1 系列なので 1 色。数字は下の表にも出す
-                    Chart(d.series, id: \.month) { p in
-                        BarMark(x: .value("月", String(p.month.prefix(7))), y: .value("支出", p.expense)).cornerRadius(4).foregroundStyle(Color.income)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                MonthBar(month: $month)
+                LoadableView(state: state, retry: load) { d in
+                    SectionLabel(text: "支出の推移（6 か月）")
+                    Paper {
+                        // 1 系列なので 1 色。数字は下の表にも出す
+                        Chart(d.series, id: \.month) { p in
+                            BarMark(x: .value("月", String(p.month.prefix(7))), y: .value("支出", p.expense)).cornerRadius(2).foregroundStyle(Color.kAccent)
+                        }
+                        .frame(height: 160)
+                        .accessibilityLabel("支出の推移の棒グラフ。数字は下の表にあります")
+                        ForEach(d.series, id: \.month) { p in
+                            DashedLine()
+                            HStack { FaintText(p.month.prefix(7).replacingOccurrences(of: "-", with: "/")); Spacer(); Text("収入 \(Money.format(p.income))・支出 \(Money.format(p.expense))").font(.system(size: 12)).monospacedDigit().foregroundStyle(Color.kSub) }.padding(.vertical, 6)
+                        }
                     }
-                    .frame(height: 160)
-                    .accessibilityLabel("支出の推移の棒グラフ。数字は下の表にあります")
-                    ForEach(d.series, id: \.month) { p in
-                        HStack { Text(p.month.prefix(7).replacingOccurrences(of: "-", with: "/")).font(.caption); Spacer(); Text("収入 \(Money.format(p.income))・支出 \(Money.format(p.expense))").font(.caption).monospacedDigit() }
+                    SectionLabel(text: "カテゴリ別の支出")
+                    if d.sum.byCategory.isEmpty { Paper { SubText("この月の支出はありません") } }
+                    else {
+                        Paper(padding: 12) {
+                            let sorted = d.sum.byCategory.sorted { $0.amount > $1.amount }
+                            ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.cat(a.categoryId)?.name ?? "不明", colorHex: ctx.cat(a.categoryId)?.color, amount: a.amount, max: sorted[0].amount) }
+                        }
+                    }
+                    if !d.sum.byPayer.isEmpty {
+                        SectionLabel(text: "払った人別")
+                        Paper(padding: 12) { let sorted = d.sum.byPayer.sorted { $0.amount > $1.amount }; ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.memberName(a.memberId), colorHex: "#6b7f99", amount: a.amount, max: sorted[0].amount) } }
+                    }
+                    if !d.sum.byBurden.isEmpty {
+                        SectionLabel(text: "負担した人別（割り勘のあと）")
+                        Paper(padding: 12) { let sorted = d.sum.byBurden.sorted { $0.amount > $1.amount }; ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.memberName(a.memberId), colorHex: "#6b7f99", amount: a.amount, max: sorted[0].amount) } }
                     }
                 }
-                let total = Swift.max(d.sum.expense, 1)
-                Section("カテゴリ別の支出") {
-                    if d.sum.byCategory.isEmpty { Text("この月の支出はありません").foregroundStyle(.secondary) }
-                    ForEach(d.sum.byCategory.sorted { $0.amount > $1.amount }, id: \.self) { a in
-                        ShareRow(label: ctx.cat(a.categoryId).map { "\($0.icon) \($0.name)" } ?? "不明", amount: a.amount, total: total)
-                    }
-                }
-                if !d.sum.byPayer.isEmpty {
-                    Section("払った人別") { ForEach(d.sum.byPayer.sorted { $0.amount > $1.amount }, id: \.self) { ShareRow(label: ctx.memberName($0.memberId), amount: $0.amount, total: total) } }
-                }
-                if !d.sum.byBurden.isEmpty {
-                    Section("負担した人別（割り勘のあと）") { ForEach(d.sum.byBurden.sorted { $0.amount > $1.amount }, id: \.self) { ShareRow(label: ctx.memberName($0.memberId), amount: $0.amount, total: total) } }
-                }
-            }
+            }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 32)
         }
+        .background(Color.kBg)
         .task(id: "\(month)-\(ctx.refresh)") { await load() }
     }
 
     private func load() async {
         do { state = .ready(ReportData(series: try await ctx.repo.monthlySeries(ctx.g, end: month), sum: try await ctx.repo.monthSummary(ctx.g, month))) }
         catch { state = .failed(Repo.map(error)) }
-    }
-}
-
-private struct ShareRow: View {
-    let label: String
-    let amount: Int64
-    let total: Int64
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack { Text(label); Spacer(); Text("\(Money.format(amount))（\(amount * 100 / total)%）").monospacedDigit() }
-            ProgressView(value: min(Double(amount) / Double(total), 1))
-        }.accessibilityElement(children: .combine)
     }
 }
 

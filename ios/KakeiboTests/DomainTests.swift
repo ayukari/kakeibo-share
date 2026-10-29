@@ -93,4 +93,36 @@ final class DomainTests: XCTestCase {
     func testInviteCodeGrouping() {
         XCTAssertEqual(MemberView.grouped("ABCDEFGHJKLM"), "ABCD-EFGH-JKLM")
     }
+
+    private func tx(_ day: Int, _ amount: Int64, kind: String = "expense", recurring: String? = nil, vis: String = "group", month: String = "2026-10") -> Txn {
+        Txn(id: "t" + String(day) + "-" + String(amount), groupId: "g", kind: kind, amount: amount, occurredOn: month + "-" + String(format: "%02d", day), categoryId: "c", payerMemberId: "m", visibility: vis, recurringId: recurring)
+    }
+
+    func testPaceCumulativeSkipsFixedPrivateAndIncome() {
+        let m = Money.date("2026-10-01")!
+        let t = [tx(1, 1000), tx(1, 500), tx(3, 200), tx(2, 80000, recurring: "r"), tx(2, 999, vis: "private"), tx(4, 5000, kind: "income"), tx(5, 300, month: "2026-09")]
+        let c = Insights.variableCumulative(t, month: m)
+        XCTAssertEqual(c.count, 31)
+        XCTAssertEqual([c[0], c[1], c[2], c[30]], [1500, 1500, 1700, 1700])
+        XCTAssertEqual(Insights.fixedTotal(t, month: m), 80000)
+    }
+
+    func testPerDayAndDaysLeft() {
+        let m = Money.date("2026-10-01")!
+        XCTAssertEqual(Insights.daysLeft(month: m, today: Money.date("2026-10-29")!), 3)
+        XCTAssertEqual(Insights.daysLeft(month: m, today: Money.date("2026-09-15")!), 31)
+        XCTAssertEqual(Insights.daysLeft(month: m, today: Money.date("2026-11-02")!), 0)
+        XCTAssertEqual(Insights.perDay(left: 20800, daysLeft: 3), 6933)
+        XCTAssertEqual(Insights.perDay(left: -5, daysLeft: 3), 0)
+        XCTAssertEqual(Insights.perDay(left: 100, daysLeft: 0), 0)
+        XCTAssertEqual(Insights.idealLine(varBudget: 30, len: 3)!, [10, 20, 30])
+        XCTAssertNil(Insights.idealLine(varBudget: 0, len: 3))
+    }
+
+    func testCalendarStepsAndShortAmounts() {
+        XCTAssertEqual([0, 25, 26, 75, 76].map { Insights.step($0, max: 100) }, [0, 1, 2, 3, 4])
+        XCTAssertEqual(Insights.short(3200), "3,200")
+        XCTAssertEqual(Insights.short(80000), "80k")
+        XCTAssertEqual(Insights.short(12400), "12k")
+    }
 }

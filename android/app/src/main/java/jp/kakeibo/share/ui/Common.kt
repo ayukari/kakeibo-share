@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,11 +32,31 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 // ---------- 見た目（落ち着いた家計簿。数字を見やすく） ----------
-private val Light = lightColorScheme(primary = Color(0xFF0E7656), onPrimary = Color.White, secondaryContainer = Color(0xFFDCEFE7), background = Color(0xFFF3F4F6), surface = Color(0xFFFCFCFA), error = Color(0xFFB42318))
-private val Dark = darkColorScheme(primary = Color(0xFF47C79B), onPrimary = Color(0xFF05261B), secondaryContainer = Color(0xFF16302A), background = Color(0xFF0E0F11), surface = Color(0xFF1A1B1E), error = Color(0xFFFF8A7A))
+private fun scheme(t: Tokens, dark: Boolean) = (if (dark) darkColorScheme() else lightColorScheme()).copy(
+    primary = t.accent, onPrimary = t.accentInk, secondaryContainer = t.accent2, onSecondaryContainer = t.ink,
+    background = t.bg, onBackground = t.ink, surface = t.card, onSurface = t.ink, onSurfaceVariant = t.sub,
+    surfaceVariant = t.bg, outline = t.line, outlineVariant = t.line, error = t.danger, tertiary = t.faint,
+    surfaceContainer = t.card, surfaceContainerHigh = t.card, surfaceContainerHighest = t.bg, surfaceContainerLow = t.card, surfaceContainerLowest = t.card,
+)
+
+// 日本語の 1 書体（端末の標準）。大きさは 12 / 14 / 16 / 20 / 28 / 44 の 6 段階
+private val KakeiboTypography = Typography(
+    bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 26.sp), bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 22.sp), bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 18.sp),
+    titleLarge = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold), titleMedium = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold), titleSmall = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+    headlineSmall = TextStyle(fontSize = 20.sp, fontWeight = FontWeight.Bold), headlineMedium = TextStyle(fontSize = 28.sp, fontWeight = FontWeight.Bold),
+    labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Bold), labelMedium = TextStyle(fontSize = 12.sp), labelSmall = TextStyle(fontSize = 12.sp),
+)
 
 @Composable
-fun KakeiboTheme(content: @Composable () -> Unit) = MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, content = content)
+fun KakeiboTheme(content: @Composable () -> Unit) {
+    val dark = isSystemInDarkTheme()
+    val t = if (dark) DarkTokens else LightTokens
+    CompositionLocalProvider(LocalTokens provides t) {
+        MaterialTheme(colorScheme = scheme(t, dark), typography = KakeiboTypography,
+            shapes = Shapes(extraSmall = RoundedCornerShape(6.dp), small = RoundedCornerShape(6.dp), medium = RoundedCornerShape(6.dp), large = RoundedCornerShape(10.dp), extraLarge = RoundedCornerShape(10.dp)),
+            content = content)
+    }
+}
 
 val IncomeColor @Composable get() = MaterialTheme.colorScheme.primary
 val OverColor @Composable get() = MaterialTheme.colorScheme.error
@@ -147,15 +169,12 @@ fun ConfirmDialog(title: String, body: String, confirm: String, onConfirm: () ->
 
 @Composable
 fun MonthBar(month: LocalDate, onChange: (LocalDate) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton({ onChange(month.minusMonths(1)) }) { Text("‹", fontSize = 22.sp) }
-        Text("${month.year}年${month.monthValue}月", Modifier.weight(1f), textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium)
-        IconButton({ onChange(month.plusMonths(1)) }, enabled = month.withDayOfMonth(1) < Money.todayJst().withDayOfMonth(1).plusMonths(1)) { Text("›", fontSize = 22.sp) }
-    }
+    val canNext = month.withDayOfMonth(1) < Money.todayJst().withDayOfMonth(1)
+    MonthNav("${month.year}年${month.monthValue}月", { onChange(month.minusMonths(1)) }, if (canNext) ({ onChange(month.plusMonths(1)) }) else null)
 }
 
 @Composable
-fun SectionTitle(text: String) = Text(text, Modifier.padding(top = 20.dp, bottom = 6.dp), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+fun SectionTitle(text: String) = SectionLabel(text)
 
 val ROLE_NAMES = mapOf("owner" to "オーナー", "admin" to "管理者", "member" to "メンバー", "viewer" to "閲覧のみ")
 fun roleRank(r: String?) = when (r) { "owner" -> 4; "admin" -> 3; "member" -> 2; "viewer" -> 1; else -> 0 }

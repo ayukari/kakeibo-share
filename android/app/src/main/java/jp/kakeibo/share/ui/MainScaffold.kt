@@ -1,22 +1,37 @@
 package jp.kakeibo.share.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kakeibo.share.data.*
+import jp.kakeibo.share.domain.Insights
 import jp.kakeibo.share.domain.Money
 import java.time.LocalDate
+import java.time.YearMonth
 
 // 開いているグループの共通情報（メンバー・カテゴリ・支払い方法）
 class GroupCtx(val app: AppVM, val g: Group, val me: Member?, val members: List<Member>, val cats: List<Category>, val pms: List<PaymentMethod>, val reloadMeta: () -> Unit) {
@@ -41,7 +56,7 @@ sealed interface Sub {
     data object Export : Sub
 }
 
-private enum class Tab(val label: String, val icon: String) { Home("ホーム", "⌂"), Txns("収支", "≡"), Settle("精算", "⇄"), Report("レポート", "▥"), More("その他", "…") }
+private enum class Tab(val label: String, val glyph: Glyph) { Home("ホーム", Glyph.Home), Txns("収支", Glyph.List), Settle("精算", Glyph.Swap), Report("レポート", Glyph.Chart), More("その他", Glyph.More) }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,9 +81,10 @@ fun MainScaffold(app: AppVM, g: Group) {
 
     BackHandler(enabled = stack.isNotEmpty()) { pop() }
     val sub = stack.lastOrNull()
+    val barColors = TopAppBarDefaults.topAppBarColors(containerColor = T.bg, titleContentColor = T.ink)
     if (sub != null) {
-        Scaffold(snackbarHost = { SnackbarHost(host) }, topBar = {
-            TopAppBar(title = { Text(subTitle(sub)) }, navigationIcon = { TextButton(pop, Modifier.heightIn(min = 48.dp)) { Text("‹ 戻る") } })
+        Scaffold(containerColor = T.bg, snackbarHost = { SnackbarHost(host) }, topBar = {
+            TopAppBar(colors = barColors, title = { Text(subTitle(sub), fontWeight = FontWeight.Bold, fontSize = 16.sp) }, navigationIcon = { TextButton(pop, Modifier.heightIn(min = 48.dp)) { Text("‹ 戻る", color = T.ink) } })
         }) { pad ->
             Box(Modifier.padding(pad).fillMaxSize()) {
                 when (sub) {
@@ -87,22 +103,17 @@ fun MainScaffold(app: AppVM, g: Group) {
     }
 
     Scaffold(
+        containerColor = T.bg,
         snackbarHost = { SnackbarHost(host) },
         topBar = {
-            TopAppBar(title = { Column { Text(g.name, maxLines = 1, overflow = TextOverflow.Ellipsis); Text("${me?.displayName ?: ""}・${ROLE_NAMES[me?.role] ?: ""}", style = MaterialTheme.typography.bodySmall) } },
-                actions = { TextButton({ app.select(null) }, Modifier.heightIn(min = 48.dp)) { Text("切替") } })
+            TopAppBar(colors = barColors, title = { Column { Text(g.name, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold, fontSize = 16.sp); Text("${me?.displayName ?: ""}・${ROLE_NAMES[me?.role] ?: ""}", color = T.sub, fontSize = 12.sp) } },
+                actions = { TextButton({ app.select(null) }, Modifier.heightIn(min = 48.dp)) { Text("切替", color = T.ink) } })
         },
         floatingActionButton = {
             if (ctx.can("member") && (tab == Tab.Home || tab == Tab.Txns))
-                ExtendedFloatingActionButton({ push(Sub.EditTxn(null)) }, Modifier.testTag("addTxn")) { Text("＋ 記録する") }
+                ExtendedFloatingActionButton({ push(Sub.EditTxn(null)) }, Modifier.testTag("addTxn"), containerColor = T.accent, contentColor = T.accentInk, shape = ButtonShape) { Text("＋ 記録する", fontWeight = FontWeight.Bold) }
         },
-        bottomBar = {
-            NavigationBar {
-                Tab.entries.forEach { t ->
-                    NavigationBarItem(selected = tab == t, onClick = { tab = t }, icon = { Text(t.icon, fontSize = 18.sp) }, label = { Text(t.label) })
-                }
-            }
-        },
+        bottomBar = { BottomBar(tab) { tab = it } },
     ) { pad ->
         Box(Modifier.padding(pad).fillMaxSize()) {
             key(refresh) {
@@ -118,6 +129,24 @@ fun MainScaffold(app: AppVM, g: Group) {
     }
 }
 
+// 下の切り替え。線のアイコンと名前。選んでいる所だけ緑
+@Composable
+private fun BottomBar(tab: Tab, onSelect: (Tab) -> Unit) {
+    val line = T.line
+    Row(Modifier.fillMaxWidth().background(T.card).drawTopLine(line).navigationBarsPadding().height(64.dp)) {
+        Tab.entries.forEach { t ->
+            val on = t == tab
+            val c = if (on) T.accent else T.sub
+            Column(Modifier.weight(1f).fillMaxHeight().clickable { onSelect(t) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                LineIcon(t.glyph, c)
+                Text(t.label, color = c, fontSize = 12.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+            }
+        }
+    }
+}
+
+private fun Modifier.drawTopLine(c: Color) = this.drawBehind { drawLine(c, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+
 @Composable
 private fun rememberSaveableTab() = androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(Tab.Home) }
 
@@ -127,79 +156,156 @@ private fun subTitle(s: Sub) = when (s) {
     Sub.Audit -> "操作の履歴"; Sub.Account -> "アカウントと設定"; Sub.Export -> "書き出しとバックアップ"
 }
 
-// ---------- ホーム ----------
-data class Dash(val sum: MonthSummary, val budgets: List<BudgetStatus>, val recent: List<Txn>, val balances: List<Balance>)
+// ---------- ホーム（かざすレシートの家計簿のホームと同じ並び: 今月の支出 → 予算とペース → カテゴリ → 最近の記録） ----------
+data class Dash(val sum: MonthSummary, val budgets: List<BudgetStatus>, val txns: List<Txn>, val prev: List<Txn>, val balances: List<Balance>)
 
 @Composable
 fun DashboardScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit, open: (Sub) -> Unit) {
     val vm: LoadVM<Dash> = viewModel(key = "dash-${ctx.g.id}-$month") {
-        LoadVM { Dash(ctx.repo.monthSummary(ctx.g.id, month), ctx.repo.budgetStatus(ctx.g.id, month), ctx.repo.recentTransactions(ctx.g.id, 5), ctx.repo.balances(ctx.g.id)) }
+        LoadVM {
+            Dash(ctx.repo.monthSummary(ctx.g.id, month), ctx.repo.budgetStatus(ctx.g.id, month), ctx.repo.transactions(ctx.g.id, month, month.plusMonths(1)),
+                ctx.repo.transactions(ctx.g.id, month.minusMonths(1), month), ctx.repo.balances(ctx.g.id))
+        }
     }
     val st by vm.state.collectAsState()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp)) {
+    val today = Money.todayJst()
+    val isCur = month.year == today.year && month.monthValue == today.monthValue
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 112.dp)) {
         item { MonthBar(month, setMonth) }
         item {
-            LoadableView(st, { vm.reload() }) { d ->
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text("今月の収支", style = MaterialTheme.typography.labelLarge)
-                            MoneyText(d.sum.balance, big = true, signed = true, color = if (d.sum.balance < 0) OverColor else Color0)
-                            Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                                Column(Modifier.weight(1f)) { Text("収入", style = MaterialTheme.typography.bodySmall); MoneyText(d.sum.income, color = IncomeColor) }
-                                Column(Modifier.weight(1f)) { Text("支出", style = MaterialTheme.typography.bodySmall); MoneyText(d.sum.expense) }
-                            }
-                            if (d.sum.prevExpense > 0) {
-                                val diff = d.sum.expense - d.sum.prevExpense
-                                Text("先月の支出より ${Money.format(kotlin.math.abs(diff))} ${if (diff >= 0) "多い" else "少ない"}", Modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
+            LoadableView(st, { vm.reload() }) { d -> DashboardContent(ctx, d, month, isCur, open) }
+        }
+    }
+}
+
+// ホームの中身（読み込んだデータから描く。画面のテストからも使う）
+@Composable
+fun DashboardContent(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean, open: (Sub) -> Unit) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Spacer(Modifier.height(0.dp))
+                    Paper {
+                        Label((if (isCur) "今月" else "${month.monthValue}月") + "の支出")
+                        Big(d.sum.expense)
+                        Faint("${d.txns.count { it.status == "active" && it.visibility == "group" }}件の記録")
+                        if (d.sum.income > 0) {
+                            Spacer(Modifier.height(12.dp))
+                            KeyValue("収入", Money.format(d.sum.income), first = true)
+                            KeyValue("収支", (if (d.sum.balance > 0) "+" else "") + Money.format(d.sum.balance), valueColor = if (d.sum.balance < 0) T.danger else T.ink)
                         }
                     }
-                    if (d.budgets.isNotEmpty()) {
-                        SectionTitle("予算")
-                        d.budgets.forEach { b -> BudgetRow(ctx, b) }
-                    }
+                    BudgetPaper(ctx, d, month, isCur, open)
                     val mine = d.balances.firstOrNull { it.memberId == ctx.me?.id }
                     if (mine != null && d.balances.size > 1) {
-                        SectionTitle("精算")
-                        Text(when { mine.net > 0 -> "あなたは ${Money.format(mine.net)} 受け取る側です"; mine.net < 0 -> "あなたは ${Money.format(-mine.net)} 払う側です"; else -> "あなたの精算は済んでいます" })
+                        Row(Modifier.fillMaxWidth().clip(PaperShape).background(T.bg).padding(12.dp, 12.dp)) {
+                            Text(when { mine.net > 0 -> "あなたは ${Money.format(mine.net)} 受け取る側です"; mine.net < 0 -> "あなたは ${Money.format(-mine.net)} 払う側です"; else -> "あなたの精算は済んでいます" }, color = T.ink, fontSize = 14.sp)
+                        }
                     }
-                    SectionTitle("最近の記録")
-                    if (d.recent.isEmpty()) EmptyBox("まだ記録がありません", if (ctx.can("member")) "右下の「記録する」から最初の収支を入れてください" else "閲覧のみの権限です")
-                    d.recent.forEach { t -> TxnRow(ctx, t) { if (ctx.canEdit(t)) open(Sub.EditTxn(t)) } }
+                    if (d.sum.byCategory.isNotEmpty()) {
+                        SectionLabel("カテゴリ")
+                        Paper(padding = 12.dp) {
+                            val sorted = d.sum.byCategory.sortedByDescending { it.amount }
+                            sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount) }
+                        }
+                    }
+                    SectionLabel("最近の記録")
+                    val recent = d.txns.filter { it.status == "active" }.take(5)
+                    if (recent.isEmpty()) Paper { EmptyBox("まだ記録がありません", if (ctx.can("member")) "右下の「記録する」から最初の収支を入れてください" else "閲覧のみの権限です") }
+                    else ListPaper { recent.forEachIndexed { i, t -> if (i > 0) DashedLine(); TxnRow(ctx, t) { if (ctx.canEdit(t)) open(Sub.EditTxn(t)) } } }
                 }
+}
+
+// 予算の残り・1 日あたり・ペースの線・カテゴリごとの予算
+@Composable
+private fun BudgetPaper(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean, open: (Sub) -> Unit) {
+    val ym = YearMonth.of(month.year, month.monthValue)
+    val today = Money.todayJst()
+    if (d.budgets.isEmpty()) {
+        Paper {
+            Text("予算を決めてみませんか", color = T.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Sub("決めておくと「今月あといくら・1日あたりいくら」が分かります。", Modifier.padding(top = 6.dp, bottom = 12.dp))
+            if (ctx.can("admin")) OutlinedButton({ open(Sub.Budgets) }, Modifier.fillMaxWidth().heightIn(min = 52.dp), shape = ButtonShape) { Text("予算を決める", color = T.ink, fontWeight = FontWeight.Bold) }
+            else Faint("予算を決められるのは管理者とオーナーです")
+        }
+        return
+    }
+    // カテゴリの予算があればその合計、なければ全体の予算
+    val catRows = d.budgets.filter { it.scope == "group" && it.categoryId != null }
+    val rows = if (catRows.isNotEmpty()) catRows else d.budgets.filter { it.scope == "group" && it.categoryId == null }
+    val total = rows.sumOf { it.amount }; val spent = rows.sumOf { it.spent }; val left = total - spent
+    val daysLeft = Insights.daysLeft(ym, today)
+    Paper {
+        Label("予算の残り")
+        if (left < 0) Text("予算を ${Money.format(-left)} こえました", color = T.danger, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 34.sp)
+        else Row(verticalAlignment = Alignment.Bottom) { Text("あと ", color = T.ink, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold); Big(left, size = 28) }
+        if (isCur && left >= 0) Sub("1日あたり ${Money.format(Insights.perDay(left, daysLeft))}（のこり $daysLeft 日）", Modifier.padding(top = 2.dp))
+        if (left < 0) Sub("来月の予算を見直すのも、ひとつの方法です。", Modifier.padding(top = 2.dp))
+        val ideal = Insights.idealLine((total - Insights.fixedTotal(d.txns, ym)).coerceAtLeast(0), ym.lengthOfMonth())
+        PaceChart(ym, d, isCur, today, ideal)
+        Spacer(Modifier.height(10.dp))
+        rows.sortedByDescending { it.ratio }.forEachIndexed { i, b ->
+            if (i > 0) DashedLine()
+            val pos = if (isCur) (today.dayOfMonth - 0.5f) / ym.lengthOfMonth() else 1f
+            val name = ctx.cat(b.categoryId)?.name ?: "全体"
+            Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (b.categoryId != null) { CategoryDot(name, ctx.cat(b.categoryId)?.color, 14.dp); Spacer(Modifier.width(8.dp)) }
+                    Text(name, Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("${Money.format(b.spent)} / ${Money.format(b.amount)}", color = T.sub, fontSize = 14.sp)
+                }
+                Meter(b.ratio.toFloat(), if (b.over) T.danger else T.accent, pos, Modifier.padding(top = 6.dp))
+                Faint(if (b.remaining >= 0) "あと ${Money.format(b.remaining)}" else "${Money.format(-b.remaining)} こえています", Modifier.padding(top = 4.dp))
             }
         }
     }
 }
 
-private val Color0 = androidx.compose.ui.graphics.Color.Unspecified
+// ペースの線: 今月の累計（緑）・先月の累計（薄い灰）・予算の目安（細い線）
+@Composable
+private fun PaceChart(ym: YearMonth, d: Dash, isCur: Boolean, today: LocalDate, ideal: LongArray?) {
+    val actualAll = Insights.variableCumulative(d.txns, ym)
+    val len = actualAll.size
+    val upto = if (isCur) today.dayOfMonth else len
+    val actual = actualAll.take(upto)
+    val prevAll = Insights.variableCumulative(d.prev, ym.minusMonths(1)).let { p -> LongArray(len) { i -> if (i < p.size) p[i] else p.lastOrNull() ?: 0 } }
+    val hasPrev = prevAll.any { it > 0 }
+    val max = maxOf(1L, actual.maxOrNull() ?: 0, prevAll.maxOrNull() ?: 0, ideal?.maxOrNull() ?: 0)
+    val acc = T.accent; val faint = T.faint; val sub = T.sub; val line = T.line; val card = T.card
+    Canvas(Modifier.fillMaxWidth().padding(top = 10.dp).height(140.dp)) {
+        val l = 6.dp.toPx(); val r = 6.dp.toPx(); val top = 10.dp.toPx(); val bot = 4.dp.toPx()
+        fun x(i: Int) = l + (size.width - l - r) * (i.toFloat() / maxOf(1, len - 1))
+        fun y(v: Long) = top + (size.height - top - bot) * (1f - v.toFloat() / max)
+        fun path(vs: List<Long>): Path = Path().apply { vs.forEachIndexed { i, v -> if (i == 0) moveTo(x(i), y(v)) else lineTo(x(i), y(v)) } }
+        drawLine(line, Offset(l, y(0)), Offset(size.width - r, y(0)), 1.dp.toPx())
+        if (ideal != null) drawPath(path(ideal.toList()), sub.copy(alpha = 0.5f), style = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        if (hasPrev) drawPath(path(prevAll.toList()), faint.copy(alpha = 0.7f), style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        if (actual.isNotEmpty()) {
+            drawPath(path(actual), acc, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+            val lx = x(actual.size - 1); val ly = y(actual.last())
+            drawCircle(card, 6.5.dp.toPx(), Offset(lx, ly)); drawCircle(acc, 4.5.dp.toPx(), Offset(lx, ly))
+        }
+    }
+    Row(Modifier.fillMaxWidth()) {
+        Faint("${ym.monthValue}/1"); Spacer(Modifier.weight(1f)); Faint("最大 ${Money.format(max)}"); Spacer(Modifier.weight(1f)); Faint("${ym.monthValue}/$len")
+    }
+    Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        LegendItem(T.accent, if (isCur) "今月" else "この月")
+        if (hasPrev) LegendItem(T.faint, "前の月")
+        if (ideal != null) LegendItem(T.sub, "予算の目安")
+    }
+}
 
 @Composable
-fun BudgetRow(ctx: GroupCtx, b: BudgetStatus) {
-    val name = (if (b.scope == "personal") ctx.memberName(b.memberId) + "の負担・" else "") + (ctx.cat(b.categoryId)?.name ?: "全体")
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row { Text(name, Modifier.weight(1f)); Text("${Money.format(b.spent)} / ${Money.format(b.amount)}", style = MaterialTheme.typography.bodySmall) }
-        LinearProgressIndicator({ b.ratio.toFloat().coerceIn(0f, 1f) }, Modifier.fillMaxWidth().padding(top = 4.dp).height(8.dp),
-            color = if (b.over) OverColor else if (b.ratio >= 0.8) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary)
-        if (b.over) Text("予算を ${Money.format(-b.remaining)} こえています", color = OverColor, style = MaterialTheme.typography.bodySmall)
-        else if (b.ratio >= 0.8) Text("残り ${Money.format(b.remaining)}（8 割をこえました）", style = MaterialTheme.typography.bodySmall)
+private fun LegendItem(c: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(Modifier.size(14.dp, 2.dp).clip(CircleShape).background(c)); Text(text, color = T.sub, fontSize = 12.sp)
     }
 }
 
 @Composable
 fun TxnRow(ctx: GroupCtx, t: Txn, onClick: () -> Unit) {
     val c = ctx.cat(t.categoryId)
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 56.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(c?.icon ?: "・", Modifier.width(36.dp), fontSize = 20.sp)
-        Column(Modifier.weight(1f)) {
-            Text((c?.name ?: "不明") + (if (t.memo.isNotBlank()) "・${t.memo}" else ""), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${t.occurredOn.substring(5).replace('-', '/')}・${ctx.memberName(t.payerMemberId)}が払った" + (if (t.splitMode != "none") "・割り勘" else "") + (if (t.visibility == "private") "・自分だけ" else ""),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        MoneyText(if (t.kind == "income") t.amount else -t.amount, signed = true, color = if (t.kind == "income") IncomeColor else Color0)
-    }
-    HorizontalDivider()
+    val sub = "${t.occurredOn.substring(5).replace('-', '/')}・${ctx.memberName(t.payerMemberId)}が払った" + (if (t.splitMode != "none") "・割り勘" else "") + (if (t.visibility == "private") "・自分だけ" else "")
+    ItemRow((c?.name ?: "不明") + (if (t.memo.isNotBlank()) "・${t.memo}" else ""), sub, (if (t.kind == "income") "+" else "") + Money.format(t.amount), c?.name, c?.color, onClick = onClick)
 }
 
 // ---------- その他 ----------
@@ -209,10 +315,16 @@ fun MoreScreen(ctx: GroupCtx, open: (Sub) -> Unit) {
         add("予算" to Sub.Budgets); add("カテゴリ" to Sub.Categories); add("メンバーと招待" to Sub.Members); add("定期的な収支" to Sub.Recurring)
         add("CSV の書き出し・バックアップ" to Sub.Export); if (ctx.can("admin")) add("操作の履歴" to Sub.Audit); add("アカウントと設定" to Sub.Account)
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(vertical = 8.dp)) {
-        items(items) { (label, s) ->
-            ListItem(headlineContent = { Text(label) }, trailingContent = { Text("›") }, modifier = Modifier.clickable { open(s) }.heightIn(min = 56.dp))
-            HorizontalDivider()
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 24.dp)) {
+        item {
+            ListPaper {
+                items.forEachIndexed { i, (label, s) ->
+                    if (i > 0) DashedLine()
+                    Row(Modifier.fillMaxWidth().clickable { open(s) }.heightIn(min = 56.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(label, Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp); Chevron(left = false, color = T.faint)
+                    }
+                }
+            }
         }
     }
 }

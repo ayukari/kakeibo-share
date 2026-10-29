@@ -6,7 +6,9 @@ import jp.kakeibo.share.domain.AppError
 import jp.kakeibo.share.domain.ErrorKind
 import jp.kakeibo.share.domain.Money
 import jp.kakeibo.share.domain.Validate
+import jp.kakeibo.share.domain.Insights
 import jp.kakeibo.share.ui.Csv
+import java.time.YearMonth
 import kotlinx.serialization.json.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -93,5 +95,33 @@ class DomainTest {
         assertTrue(lines[0].startsWith("日付,種類,金額"))
         assertEquals("2026-10-01,支出,1000,食費,A,,\"'+danger,1\",グループ,均等,A:500 B:500,t1", lines[1])
         assertEquals(3, Csv.BOM.size)
+    }
+
+    private fun tx(day: Int, amount: Long, kind: String = "expense", recurring: String? = null, vis: String = "group", month: String = "2026-10") =
+        Txn("t$day$amount", "g", kind, amount, "$month-%02d".format(day), "c", "m", recurringId = recurring, visibility = vis)
+
+    @Test fun paceCumulativeSkipsFixedPrivateAndIncome() {
+        val m = YearMonth.of(2026, 10)
+        val t = listOf(tx(1, 1000), tx(1, 500), tx(3, 200), tx(2, 80000, recurring = "r"), tx(2, 999, vis = "private"), tx(4, 5000, kind = "income"), tx(5, 300, month = "2026-09"))
+        val c = Insights.variableCumulative(t, m)
+        assertEquals(31, c.size)
+        assertEquals(1500L, c[0]); assertEquals(1500L, c[1]); assertEquals(1700L, c[2]); assertEquals(1700L, c[30])
+        assertEquals(80000L, Insights.fixedTotal(t, m))
+    }
+
+    @Test fun perDayAndDaysLeft() {
+        val m = YearMonth.of(2026, 10)
+        assertEquals(3, Insights.daysLeft(m, java.time.LocalDate.of(2026, 10, 29)))
+        assertEquals(31, Insights.daysLeft(m, java.time.LocalDate.of(2026, 9, 15)))
+        assertEquals(0, Insights.daysLeft(m, java.time.LocalDate.of(2026, 11, 2)))
+        assertEquals(6933L, Insights.perDay(20800, 3))
+        assertEquals(0L, Insights.perDay(-5, 3)); assertEquals(0L, Insights.perDay(100, 0))
+        assertEquals(listOf(10L, 20L, 30L), Insights.idealLine(30, 3)!!.toList())
+        assertNull(Insights.idealLine(0, 3))
+    }
+
+    @Test fun calendarStepsAndShortAmounts() {
+        assertEquals(0, Insights.step(0, 100)); assertEquals(1, Insights.step(25, 100)); assertEquals(2, Insights.step(26, 100)); assertEquals(3, Insights.step(75, 100)); assertEquals(4, Insights.step(76, 100))
+        assertEquals("3,200", Insights.short(3200)); assertEquals("80k", Insights.short(80000)); assertEquals("12k", Insights.short(12400))
     }
 }

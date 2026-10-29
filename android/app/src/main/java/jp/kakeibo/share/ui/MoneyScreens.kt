@@ -13,6 +13,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.viewmodel.compose.viewModel
 import jp.kakeibo.share.data.*
 import jp.kakeibo.share.domain.Money
@@ -40,46 +42,54 @@ fun SettlementScreen(ctx: GroupCtx) {
             item {
                 LoadableView(st, { vm.reload() }) { d ->
                     Column {
-                        Text("割り勘にした支出だけで計算します。プラスは受け取る側、マイナスは払う側です。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        SectionTitle("いまの差額")
-                        d.balances.forEach { b ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(b.displayName + if (b.status != "active") "（退出）" else "")
-                                    Text("立て替え ${Money.format(b.paid)}・負担 ${Money.format(b.burden)}", style = MaterialTheme.typography.bodySmall)
-                                }
-                                MoneyText(b.net, signed = true, color = if (b.net < 0) OverColor else IncomeColor)
+                        Sub("割り勘にした支出だけで計算します。プラスは受け取る側、マイナスは払う側です。")
+                        SectionLabel("いまの差額")
+                        ListPaper {
+                            d.balances.forEachIndexed { i, b ->
+                                if (i > 0) DashedLine()
+                                val m = ctx.members.firstOrNull { it.id == b.memberId }
+                                ItemRow(b.displayName + if (b.status != "active") "（退出）" else "", "立て替え ${Money.format(b.paid)}・負担 ${Money.format(b.burden)}",
+                                    (if (b.net > 0) "+" else "") + Money.format(b.net), b.displayName, "#6b7280", amountColor = if (b.net < 0) T.danger else T.ink)
                             }
                         }
-                        SectionTitle("精算の提案")
-                        if (d.suggestions.isEmpty()) Text("いま精算が必要な人はいません（確認待ちの精算は差し引いています）")
-                        d.suggestions.forEach { s ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("${ctx.memberName(s.fromMember)} → ${ctx.memberName(s.toMember)}", Modifier.weight(1f))
-                                MoneyText(s.amount)
-                                if (ctx.can("member")) TextButton({ record = s }, Modifier.heightIn(min = 48.dp), enabled = !busy) { Text("払った") }
+                        SectionLabel("精算の提案")
+                        if (d.suggestions.isEmpty()) Paper { Sub("いま精算が必要な人はいません（確認待ちの精算は差し引いています）") }
+                        else ListPaper {
+                            d.suggestions.forEachIndexed { i, sg ->
+                                if (i > 0) DashedLine()
+                                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text("${ctx.memberName(sg.fromMember)} → ${ctx.memberName(sg.toMember)}", Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Text(Money.format(sg.amount), color = T.ink, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+                                    if (ctx.can("member")) TextButton({ record = sg }, Modifier.heightIn(min = 48.dp), enabled = !busy) { Text("払った", color = T.accent, fontWeight = FontWeight.Bold) }
+                                }
                             }
                         }
                         val pending = d.history.filter { it.status == "pending" }
                         if (pending.isNotEmpty()) {
-                            SectionTitle("確認待ち")
-                            pending.forEach { s ->
-                                Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                                    Text("${ctx.memberName(s.fromMember)} → ${ctx.memberName(s.toMember)}  ${Money.format(s.amount)}")
-                                    Row {
-                                        // 受け取った人（か管理者）が確認すると差額に入る
-                                        if (s.toMember == ctx.me?.id || ctx.can("admin")) TextButton({ vm.act("受け取りを確認しました") { ctx.repo.confirmSettlement(s.id) } }, enabled = !busy) { Text("受け取りを確認") }
-                                        if (s.fromMember == ctx.me?.id || s.toMember == ctx.me?.id || ctx.can("admin")) TextButton({ cancel = s }, enabled = !busy) { Text("取り消す", color = OverColor) }
+                            SectionLabel("確認待ち")
+                            ListPaper {
+                                pending.forEachIndexed { i, p ->
+                                    if (i > 0) DashedLine()
+                                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                        Text("${ctx.memberName(p.fromMember)} → ${ctx.memberName(p.toMember)}  ${Money.format(p.amount)}", color = T.ink, fontWeight = FontWeight.Bold)
+                                        Row {
+                                            // 受け取った人（か管理者）が確認すると差額に入る
+                                            if (p.toMember == ctx.me?.id || ctx.can("admin")) TextButton({ vm.act("受け取りを確認しました") { ctx.repo.confirmSettlement(p.id) } }, Modifier.heightIn(min = 48.dp), enabled = !busy) { Text("受け取りを確認", color = T.accent, fontWeight = FontWeight.Bold) }
+                                            if (p.fromMember == ctx.me?.id || p.toMember == ctx.me?.id || ctx.can("admin")) TextButton({ cancel = p }, Modifier.heightIn(min = 48.dp), enabled = !busy) { Text("取り消す", color = T.danger) }
+                                        }
                                     }
                                 }
                             }
                         }
-                        SectionTitle("精算の履歴")
+                        SectionLabel("精算の履歴")
                         val done = d.history.filter { it.status != "pending" }
-                        if (done.isEmpty()) Text("まだありません", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        done.forEach { s ->
-                            Text("${(s.confirmedAt ?: s.createdAt ?: "").take(10)}  ${ctx.memberName(s.fromMember)} → ${ctx.memberName(s.toMember)}  ${Money.format(s.amount)}" + if (s.status == "cancelled") "（取り消し）" else "",
-                                Modifier.padding(vertical = 4.dp), style = MaterialTheme.typography.bodyMedium)
+                        if (done.isEmpty()) Paper { Sub("まだありません") }
+                        else ListPaper {
+                            done.forEachIndexed { i, h ->
+                                if (i > 0) DashedLine()
+                                Text("${(h.confirmedAt ?: h.createdAt ?: "").take(10)}  ${ctx.memberName(h.fromMember)} → ${ctx.memberName(h.toMember)}  ${Money.format(h.amount)}" + if (h.status == "cancelled") "（取り消し）" else "",
+                                    Modifier.padding(horizontal = 16.dp, vertical = 12.dp), color = T.ink, fontSize = 14.sp)
+                            }
                         }
                     }
                 }
@@ -117,26 +127,32 @@ fun ReportScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit)
         item {
             LoadableView(st, { vm.reload() }) { d ->
                 Column {
-                    SectionTitle("支出の推移（6 か月）")
-                    ExpenseBars(d.series)
-                    d.series.forEach { p -> Row(Modifier.fillMaxWidth()) { Text(p.month.take(7).replace('-', '/'), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall); Text("収入 ${Money.format(p.income)}・支出 ${Money.format(p.expense)}", style = MaterialTheme.typography.bodySmall) } }
-                    SectionTitle("カテゴリ別の支出")
-                    if (d.sum.byCategory.isEmpty()) Text("この月の支出はありません", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    val total = d.sum.expense.coerceAtLeast(1)
-                    d.sum.byCategory.sortedByDescending { it.amount }.forEach { a -> ShareRow((ctx.cat(a.categoryId)?.let { "${it.icon} ${it.name}" } ?: "不明"), a.amount, total) }
-                    if (d.sum.byPayer.isNotEmpty()) { SectionTitle("払った人別"); d.sum.byPayer.sortedByDescending { it.amount }.forEach { a -> ShareRow(ctx.memberName(a.memberId), a.amount, total) } }
-                    if (d.sum.byBurden.isNotEmpty()) { SectionTitle("負担した人別（割り勘のあと）"); d.sum.byBurden.sortedByDescending { it.amount }.forEach { a -> ShareRow(ctx.memberName(a.memberId), a.amount, total) } }
+                    SectionLabel("支出の推移（6 か月）")
+                    Paper {
+                        ExpenseBars(d.series)
+                        Spacer(Modifier.height(8.dp))
+                        d.series.forEachIndexed { i, p ->
+                            DashedLine()
+                            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)) { Faint(p.month.take(7).replace('-', '/'), Modifier.weight(1f)); Text("収入 ${Money.format(p.income)}・支出 ${Money.format(p.expense)}", color = T.sub, fontSize = 12.sp) }
+                        }
+                    }
+                    SectionLabel("カテゴリ別の支出")
+                    if (d.sum.byCategory.isEmpty()) Paper { Sub("この月の支出はありません") }
+                    else Paper(padding = 12.dp) {
+                        val sorted = d.sum.byCategory.sortedByDescending { it.amount }
+                        sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount) }
+                    }
+                    if (d.sum.byPayer.isNotEmpty()) {
+                        SectionLabel("払った人別")
+                        Paper(padding = 12.dp) { val sorted = d.sum.byPayer.sortedByDescending { it.amount }; sorted.forEach { a -> CategoryBar(ctx.memberName(a.memberId), "#6b7f99", a.amount, sorted.first().amount) } }
+                    }
+                    if (d.sum.byBurden.isNotEmpty()) {
+                        SectionLabel("負担した人別（割り勘のあと）")
+                        Paper(padding = 12.dp) { val sorted = d.sum.byBurden.sortedByDescending { it.amount }; sorted.forEach { a -> CategoryBar(ctx.memberName(a.memberId), "#6b7f99", a.amount, sorted.first().amount) } }
+                    }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun ShareRow(label: String, amount: Long, total: Long) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Row { Text(label, Modifier.weight(1f)); Text("${Money.format(amount)}（${amount * 100 / total}%）") }
-        LinearProgressIndicator({ (amount.toFloat() / total).coerceIn(0f, 1f) }, Modifier.fillMaxWidth().padding(top = 2.dp).height(6.dp))
     }
 }
 
@@ -144,15 +160,30 @@ private fun ShareRow(label: String, amount: Long, total: Long) {
 @Composable
 private fun ExpenseBars(series: List<MonthPoint>) {
     val max = (series.maxOfOrNull { it.expense } ?: 0).coerceAtLeast(1)
-    val color = MaterialTheme.colorScheme.primary
-    val grid = MaterialTheme.colorScheme.outlineVariant
+    val color = T.accent
+    val grid = T.line
     Canvas(Modifier.fillMaxWidth().height(160.dp).semantics { contentDescription = "支出の推移の棒グラフ。数字は下の表にあります" }) {
         val n = series.size.coerceAtLeast(1); val slot = size.width / n; val w = (slot * 0.5f).coerceAtMost(48.dp.toPx())
         drawLine(grid, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
         series.forEachIndexed { i, p ->
             val h = size.height * p.expense / max
-            if (h > 0) drawRoundRect(color, Offset(slot * i + (slot - w) / 2, size.height - h), Size(w, h), CornerRadius(4.dp.toPx()))
+            if (h > 0) drawRoundRect(color, Offset(slot * i + (slot - w) / 2, size.height - h), Size(w, h), CornerRadius(2.dp.toPx()))
         }
+    }
+}
+
+// 予算の 1 行（名前・使った額 / 予算・進み具合の棒・あと / こえた額）
+@Composable
+fun BudgetRow(ctx: GroupCtx, b: BudgetStatus) {
+    val name = (if (b.scope == "personal") ctx.memberName(b.memberId) + "の負担・" else "") + (ctx.cat(b.categoryId)?.name ?: "全体")
+    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (b.categoryId != null) { CategoryDot(ctx.cat(b.categoryId)?.name, ctx.cat(b.categoryId)?.color, 14.dp); Spacer(Modifier.width(8.dp)) }
+            Text(name, Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text("${Money.format(b.spent)} / ${Money.format(b.amount)}", color = T.sub, fontSize = 14.sp)
+        }
+        Meter(b.ratio.toFloat(), if (b.over) T.danger else T.accent, null, Modifier.padding(top = 6.dp))
+        Faint(if (b.remaining >= 0) "あと ${Money.format(b.remaining)}" else "${Money.format(-b.remaining)} こえています", Modifier.padding(top = 4.dp))
     }
 }
 
@@ -174,16 +205,14 @@ fun BudgetScreen(ctx: GroupCtx, month: LocalDate) {
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
             item {
-                Text("${month.year}年${month.monthValue}月の予算", style = MaterialTheme.typography.titleMedium)
+                SectionLabel("${month.year}年${month.monthValue}月の予算")
                 LoadableView(st, { vm.reload() }, isEmpty = { it.status.isEmpty() }, empty = { EmptyBox("予算はまだありません", "カテゴリごと・全体の月の上限を決められます") }) { d ->
-                    Column { d.status.forEach { b -> BudgetRow(ctx, b); if (ctx.can("admin")) TextButton({ del = b }) { Text("この予算をやめる", color = OverColor) } } }
+                    Paper { d.status.forEachIndexed { i, b -> if (i > 0) DashedLine(); BudgetRow(ctx, b); if (ctx.can("admin")) TextButton({ del = b }) { Text("この予算をやめる", color = T.danger) } } }
                 }
             }
             if (ctx.can("admin")) item {
                 SectionTitle("予算を決める（この月から、次に変えるまで続く）")
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    listOf("group" to "グループ全体の支出", "personal" to "1 人の負担").forEachIndexed { i, (k, l) -> SegmentedButton(scope == k, { scope = k }, SegmentedButtonDefaults.itemShape(i, 2)) { Text(l) } }
-                }
+                Segmented(listOf("グループ全体の支出", "1 人の負担"), if (scope == "group") 0 else 1, { scope = if (it == 0) "group" else "personal" })
                 Spacer(Modifier.height(8.dp))
                 Picker("カテゴリ", listOf<Category?>(null) + ctx.cats.filter { it.kind == "expense" && it.archivedAt == null }, cat, { it?.name ?: "全体（すべての支出）" }, { cat = it })
                 if (scope == "personal") Picker("人", ctx.activeMembers, member, { it.displayName }, { member = it })

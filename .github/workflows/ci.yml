@@ -33,7 +33,11 @@ jobs:
         run: chmod +x gradlew && ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
       - uses: actions/upload-artifact@v4
         if: always()
-        with: { name: android-reports, path: android/app/build/reports }
+        with:
+          name: android-reports
+          path: |
+            android/app/build/reports
+            android/app/build/shots
 
   ios:
     runs-on: macos-15
