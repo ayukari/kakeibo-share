@@ -1,0 +1,11 @@
+{
+  "rule": "均等割り: floor(金額 / 人数) を全員に。余り（円）はメンバーの並び（参加日時 → ID）の先頭から 1 円ずつ",
+  "cases": [
+    { "amount": 1000, "members": 3, "expected": [334, 333, 333] },
+    { "amount": 1001, "members": 3, "expected": [334, 334, 333] },
+    { "amount": 999, "members": 3, "expected": [333, 333, 333] },
+    { "amount": 1, "members": 3, "expected": [1, 0, 0] },
+    { "amount": 100, "members": 1, "expected": [100] },
+    { "amount": 999999999, "members": 7, "expected": [142857143, 142857143, 142857143, 142857143, 142857143, 142857142, 142857142] }
+  ]
+}

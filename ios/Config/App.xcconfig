@@ -1,0 +1,5 @@
+// 接続先は Secrets.xcconfig に書く（git に入れない）。例は Secrets.example.xcconfig
+// service_role キーは絶対に書かない（anon キーだけ。権限は RLS と DB の関数で守る）
+SUPABASE_URL =
+SUPABASE_ANON_KEY =
+#include? "Secrets.xcconfig"

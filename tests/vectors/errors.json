@@ -1,0 +1,20 @@
+{
+  "rule": "サーバーの SQLSTATE（なければ HTTP の状態）からエラーの分類を決める。両 OS で同じ結果になること",
+  "cases": [
+    { "code": "KB401", "http": 400, "kind": "Unauthorized" },
+    { "code": "KB403", "http": 400, "kind": "Forbidden" },
+    { "code": "42501", "http": 401, "kind": "Forbidden" },
+    { "code": "KB404", "http": 400, "kind": "NotFound" },
+    { "code": "KB409", "http": 400, "kind": "Conflict" },
+    { "code": "KB422", "http": 400, "kind": "Validation" },
+    { "code": "22P02", "http": 400, "kind": "Validation" },
+    { "code": "23514", "http": 400, "kind": "Validation" },
+    { "code": null, "http": 401, "kind": "Unauthorized" },
+    { "code": null, "http": 403, "kind": "Forbidden" },
+    { "code": null, "http": 404, "kind": "NotFound" },
+    { "code": null, "http": 409, "kind": "Conflict" },
+    { "code": null, "http": 422, "kind": "Validation" },
+    { "code": null, "http": 500, "kind": "Server" },
+    { "code": "XX000", "http": 500, "kind": "Server" }
+  ]
+}

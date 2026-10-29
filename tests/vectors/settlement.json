@@ -1,0 +1,16 @@
+{
+  "rule": "差額 = 立替（分担のある支出で払った額）− 負担 + 払った精算 − 受け取った精算（確認済みだけ）。提案は払う側（差額の小さい順）と受け取る側（大きい順）を順に組み合わせる",
+  "members": ["A", "B", "C"],
+  "expenses": [
+    { "payer": "A", "amount": 3000, "split": "equal", "among": ["A", "B", "C"] },
+    { "payer": "B", "amount": 1000, "split": "custom", "shares": { "A": 0, "B": 400, "C": 600 } },
+    { "payer": "C", "amount": 500, "split": "none" }
+  ],
+  "expected_balances": {
+    "A": { "paid": 3000, "burden": 1000, "net": 2000 },
+    "B": { "paid": 1000, "burden": 1400, "net": -400 },
+    "C": { "paid": 0, "burden": 1600, "net": -1600 }
+  },
+  "expected_suggestions": [ { "from": "C", "to": "A", "amount": 1600 }, { "from": "B", "to": "A", "amount": 400 } ],
+  "after_settle": { "from": "C", "to": "A", "amount": 1600, "expected_net": { "A": 400, "B": -400, "C": 0 } }
+}

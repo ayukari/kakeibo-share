@@ -1,0 +1,221 @@
+import SwiftUI
+
+// ---------- 収支の一覧（月ごと。種類・カテゴリ・払った人・メモの検索・並べ替え） ----------
+struct TxnListView: View {
+    let ctx: GroupCtx
+    @Binding var month: Date
+    @State private var state: Loadable<[Txn]> = .loading
+    @State private var kind = "all"
+    @State private var catId: String? = nil
+    @State private var payerId: String? = nil
+    @State private var query = ""
+    @State private var sort = "new"
+
+    var body: some View {
+        List {
+            MonthBar(month: $month)
+            Section {
+                Picker("種類", selection: $kind) { Text("すべて").tag("all"); Text("支出").tag("expense"); Text("収入").tag("income") }.pickerStyle(.segmented)
+                Picker("カテゴリ", selection: $catId) {
+                    Text("すべて").tag(String?.none)
+                    ForEach(ctx.cats.filter { kind == "all" || $0.kind == kind }) { Text($0.name).tag(Optional($0.id)) }
+                }
+                Picker("払った人", selection: $payerId) {
+                    Text("全員").tag(String?.none)
+                    ForEach(ctx.members) { Text($0.displayName).tag(Optional($0.id)) }
+                }
+                Picker("並べ替え", selection: $sort) { Text("新しい順").tag("new"); Text("古い順").tag("old"); Text("金額順").tag("amount") }
+            }
+            LoadableView(state: state, retry: load) { all in
+                let list = filtered(all)
+                Section {
+                    if list.isEmpty {
+                        EmptyBox(title: all.isEmpty ? "この月の記録はありません" : "条件に合う記録はありません", message: all.isEmpty ? "月を変えるか、記録を追加してください" : "絞り込みを変えてみてください")
+                    }
+                    ForEach(list) { t in TxnLink(ctx: ctx, t: t) }
+                } header: {
+                    let inc = list.filter { $0.kind == "income" }.reduce(Int64(0)) { $0 + $1.amount }
+                    let exp = list.filter { $0.kind == "expense" }.reduce(Int64(0)) { $0 + $1.amount }
+                    Text("\(list.count) 件・収入 \(Money.format(inc))・支出 \(Money.format(exp))")
+                }
+            }
+        }
+        .searchable(text: $query, prompt: "メモ・カテゴリで探す")
+        .task(id: "\(month)-\(ctx.refresh)") { await load() }
+        .refreshable { await load() }
+    }
+
+    private func filtered(_ all: [Txn]) -> [Txn] {
+        let q = query.trimmingCharacters(in: .whitespaces)
+        let l = all.filter { t in
+            (kind == "all" || t.kind == kind) && (catId == nil || t.categoryId == catId) && (payerId == nil || t.payerMemberId == payerId) &&
+            (q.isEmpty || t.memo.localizedCaseInsensitiveContains(q) || (ctx.cat(t.categoryId)?.name.localizedCaseInsensitiveContains(q) ?? false))
+        }
+        switch sort { case "old": return l.reversed(); case "amount": return l.sorted { $0.amount > $1.amount }; default: return l }
+    }
+
+    private func load() async {
+        do { state = .ready(try await ctx.repo.transactions(ctx.g, from: month, toExclusive: Money.addMonths(month, 1))) } catch { state = .failed(Repo.map(error)) }
+    }
+}
+
+// ---------- 取引の入力・編集 ----------
+struct TxnEditView: View {
+    let ctx: GroupCtx
+    let txn: Txn?
+    @Environment(\.dismiss) private var dismiss
+    @State private var requestId = UUID().uuidString.lowercased()   // 同じ入力の再送を二重登録にしない
+    @State private var kind = "expense"
+    @State private var amount = ""
+    @State private var date = Money.todayJST()
+    @State private var catId: String? = nil
+    @State private var payerId: String? = nil
+    @State private var pmId: String? = nil
+    @State private var memo = ""
+    @State private var isPrivate = false
+    @State private var split = "none"
+    @State private var equal: Set<String> = []
+    @State private var custom: [String: String] = [:]
+    @State private var splitsLoaded = true
+    @State private var error: String?
+    @State private var amountError: String?
+    @State private var busy = false
+    @State private var similar: [Txn]? = nil
+    @State private var askDelete = false
+    @State private var started = false
+
+    private var splitMembers: [Member] { ctx.members.filter { $0.status == "active" || equal.contains($0.id) || custom[$0.id] != nil } }
+
+    var body: some View {
+        Form {
+            Picker("種類", selection: $kind) { Text("支出").tag("expense"); Text("収入").tag("income") }.pickerStyle(.segmented)
+                .onChange(of: kind) { if ctx.cat(catId)?.kind != kind { catId = nil } }
+            Section {
+                AmountField(label: "金額（円）", text: $amount, error: amountError).accessibilityIdentifier("amount")
+                DatePicker("日付", selection: $date, displayedComponents: .date).environment(\.timeZone, Money.tokyo)
+                Picker("カテゴリ", selection: $catId) {
+                    Text("選んでください").tag(String?.none)
+                    ForEach(ctx.cats.filter { $0.kind == kind && ($0.archivedAt == nil || $0.id == txn?.categoryId) }) { Text("\($0.icon) \($0.name)").tag(Optional($0.id)) }
+                }.accessibilityIdentifier("category")
+                Picker(kind == "income" ? "受け取った人" : "払った人", selection: $payerId) {
+                    ForEach(ctx.members.filter { $0.status == "active" || $0.id == txn?.payerMemberId }) { Text($0.displayName).tag(Optional($0.id)) }
+                }
+                Picker("支払い方法（任意）", selection: $pmId) {
+                    Text("なし").tag(String?.none)
+                    ForEach(ctx.pms.filter { $0.archivedAt == nil || $0.id == txn?.paymentMethodId }) { Text($0.name).tag(Optional($0.id)) }
+                }
+                TextField("メモ（任意）", text: $memo, axis: .vertical)
+                Toggle("自分だけに見せる（グループの集計と精算には入りません）", isOn: $isPrivate)
+            }
+            if kind == "expense" && !isPrivate {
+                Section("割り勘") {
+                    Picker("割り勘", selection: $split) { Text("しない").tag("none"); Text("均等").tag("equal"); Text("金額を指定").tag("custom") }.pickerStyle(.segmented)
+                    let a = Money.parse(amount) ?? 0
+                    if split == "equal" {
+                        let chosen = splitMembers.filter { equal.contains($0.id) }
+                        let shares = Money.equalSplit(a, Swift.max(chosen.count, 1))
+                        ForEach(splitMembers) { m in
+                            Toggle(isOn: Binding(get: { equal.contains(m.id) }, set: { if $0 { equal.insert(m.id) } else { equal.remove(m.id) } })) {
+                                HStack { Text(m.displayName); Spacer(); if let i = chosen.firstIndex(of: m), a > 0 { Text(Money.format(shares[i])).monospacedDigit() } }
+                            }
+                        }
+                        Text("割り切れない 1 円は、参加の早い人から順に負担します（サーバーで計算）").font(.caption)
+                    } else if split == "custom" {
+                        ForEach(splitMembers) { m in
+                            AmountField(label: "\(m.displayName)の負担", text: Binding(get: { custom[m.id] ?? "" }, set: { custom[m.id] = $0 }))
+                        }
+                        let sum = splitMembers.reduce(Int64(0)) { $0 + (custom[$1.id].flatMap(Money.parse) ?? 0) }
+                        Text(sum == a ? "合計が金額と合っています" : "合計 \(Money.format(sum))（あと \(Money.format(a - sum))）").foregroundStyle(sum == a ? Color.income : Color.over)
+                    }
+                }
+            }
+            if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("txnError") }
+            Section {
+                Button { trySave() } label: { HStack { Spacer(); if busy { ProgressView() } else { Text("保存する").bold() }; Spacer() }.frame(minHeight: 44) }
+                    .disabled(busy).accessibilityIdentifier("save")
+                if txn != nil { Button("この記録を消す", role: .destructive) { askDelete = true }.disabled(busy) }
+            }
+        }
+        .navigationTitle(txn == nil ? "記録する" : "取引の編集")
+        .toolbar { if txn == nil { ToolbarItem(placement: .cancellationAction) { Button("やめる") { dismiss() } } } }
+        .task { await start() }
+        .alert("似た記録があります", isPresented: Binding(get: { similar != nil }, set: { if !$0 { similar = nil } })) {
+            Button("それでも保存") { similar = nil; if let t = input() { save(t) } }
+            Button("やめる", role: .cancel) { similar = nil }
+        } message: {
+            Text("同じ日・同じ金額・同じカテゴリの記録が \(similar?.count ?? 0) 件あります。二重に入れていないか確かめてください。")
+        }
+        .confirmationDialog("記録を消しますか", isPresented: $askDelete, titleVisibility: .visible) {
+            Button("消す", role: .destructive) { remove() }
+        } message: { Text("操作の履歴には残ります。") }
+    }
+
+    private func start() async {
+        guard !started else { return }
+        started = true
+        guard let t = txn else { payerId = ctx.me?.id; equal = Set(ctx.activeMembers.map(\.id)); return }
+        kind = t.kind; amount = String(t.amount); date = Money.date(t.occurredOn) ?? date; catId = t.categoryId; payerId = t.payerMemberId
+        pmId = t.paymentMethodId; memo = t.memo; isPrivate = t.visibility == "private"; split = t.splitMode
+        if t.splitMode != "none" {
+            splitsLoaded = false
+            do {
+                let ss = try await ctx.repo.splits([t.id])
+                equal = Set(ss.map(\.memberId)); for s in ss { custom[s.memberId] = String(s.amount) }
+                splitsLoaded = true
+            } catch { self.error = "割り勘の内訳を読めませんでした: \(Repo.map(error).userMessage)" }
+        }
+    }
+
+    private func input() -> TxnInput? {
+        amountError = Validate.amount(amount); error = nil
+        let a = Money.parse(amount) ?? 0
+        let shares = splitMembers.compactMap { custom[$0.id].flatMap(Money.parse) }
+        let problem = amountError ?? Validate.date(date) ?? (catId == nil ? "カテゴリを選んでください" : nil) ?? (payerId == nil ? "払った人を選んでください" : nil) ?? Validate.memo(memo)
+            ?? (split == "equal" && equal.isEmpty ? "割り勘する人を選んでください" : nil)
+            ?? (split == "custom" ? Validate.customSplit(a, shares) : nil)
+            ?? (splitsLoaded ? nil : "割り勘の内訳を読み込めていません")
+        if let problem { if problem != amountError { error = problem }; return nil }   // 金額の誤りは入力欄の下に出す
+        let mode = (kind == "income" || isPrivate) ? "none" : split
+        return TxnInput(id: txn?.id, version: txn?.version, clientRequestId: requestId, kind: kind, amount: a, occurredOn: Money.dateString(date),
+                        categoryId: catId!, payerMemberId: payerId!, paymentMethodId: pmId, memo: memo.trimmingCharacters(in: .whitespacesAndNewlines),
+                        visibility: isPrivate ? "private" : "group", splitMode: mode,
+                        equalMembers: splitMembers.map(\.id).filter { equal.contains($0) },
+                        customShares: custom.compactMapValues { Money.parse($0) }.filter { $0.value > 0 })
+    }
+
+    private func save(_ t: TxnInput) {
+        busy = true
+        Task { @MainActor in
+            do {
+                _ = try await ctx.repo.saveTransaction(ctx.g, t)
+                ctx.app.toast = txn == nil ? "保存しました" : "変更を保存しました"
+                ctx.refresh += 1
+                dismiss()
+            } catch { self.error = Repo.map(error).userMessage }
+            busy = false
+        }
+    }
+
+    private func trySave() {
+        guard let t = input() else { return }
+        if txn != nil { save(t); return }
+        busy = true
+        Task { @MainActor in
+            do {
+                let s = try await ctx.repo.similar(ctx.g, amount: t.amount, date: t.occurredOn, category: t.categoryId)
+                busy = false
+                if s.isEmpty { save(t) } else { similar = s }
+            } catch { busy = false; self.error = Repo.map(error).userMessage }
+        }
+    }
+
+    private func remove() {
+        guard let t = txn else { return }
+        busy = true
+        Task { @MainActor in
+            do { try await ctx.repo.deleteTransaction(t.id, version: t.version); ctx.app.toast = "消しました"; ctx.refresh += 1; dismiss() }
+            catch { self.error = Repo.map(error).userMessage }
+            busy = false
+        }
+    }
+}

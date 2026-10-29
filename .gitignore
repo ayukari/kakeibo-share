@@ -1,0 +1,20 @@
+# ローカルのテスト用 DB・ビルド成果物・秘密情報
+.localdb/
+*.log
+.env
+.env.*
+!.env.example
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.kotlin/
+ios/build/
+ios/DerivedData/
+*.xcuserstate
+xcuserdata/
+backups/
+ios/Config/Secrets.xcconfig
+ios/Kakeibo.xcodeproj/
+supabase/.temp/
+supabase/.branches/

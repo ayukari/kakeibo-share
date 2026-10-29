@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- セッションの暗号文は端末の鍵でしか開けないので、クラウドのバックアップと端末間の移行から外す -->
+<data-extraction-rules>
+    <cloud-backup><exclude domain="sharedpref" path="." /><exclude domain="file" path="." /></cloud-backup>
+    <device-transfer><exclude domain="sharedpref" path="." /><exclude domain="file" path="." /></device-transfer>
+</data-extraction-rules>
