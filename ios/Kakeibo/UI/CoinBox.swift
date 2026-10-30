@@ -1,135 +1,163 @@
 import SwiftUI
+import CoreMotion
 
-// 硬貨・お札の絵。Blender で作った 3D を描き出したもの（tools/render3d/money_sprites.py。Resources/Money）
-// 本物と見まちがえないよう、肖像や図柄は描かず、色・金属の質感・形だけ（通貨及証券模造取締法。財務省の FAQ）
+// 硬貨・お札の絵。Blender で作った 3D を描き出したもの（tools/render3d/money_sprites.py。お札は bill.py で作り込んだもの。Resources/Money）
+// 本物と見まちがえないよう、肖像や実際の図柄は描かず、色・質感・形と、このアプリ独自の模様だけ（通貨及証券模造取締法。財務省の FAQ）
 // 段階ごとに 8 コマ。0 コマ目が置いたときの姿で、1〜7 コマ目は横の軸で 45° ずつ回した姿（落ちながら回る）
 private let frameCount = 8
+private let billAspect: CGFloat = 240.0 / 144.0   // お札の絵の横:縦
 private func moneyFrame(_ tier: Int, _ f: Int) -> Image {
     Image(uiImage: UIImage(named: "money_t\(tier)_f\(f)") ?? UIImage())
 }
 
-// 積んだ高さ（いちばん上の段の上端）が fillH をこえない段の数。少しでも貯まっていれば 1 段
-private func stackRows(_ fillH: CGFloat, _ item: CGFloat, _ step: CGFloat) -> Int {
-    if fillH <= 0 { return 0 }
-    if fillH <= item { return 1 }
-    return 1 + Int(((fillH - item) / step).rounded(.up))
+// 箱の内側の大きさと、中身 1 枚の大きさ d（pt）。目標額ちょうどの枚数で、箱がちょうどいっぱいになる大きさにする
+private struct BoxGeo: Equatable {
+    let boxW, lid, left, right, top, bottom, d: CGFloat
+    let bill: Bool
+    var w: CGFloat { right - left }
+    var h: CGFloat { bottom - top }
+    // c 枚を積んだときのおよその上端（目盛りに使う）
+    func pileTop(_ c: Double) -> CGFloat { bottom - CGFloat(c) * CGFloat(CoinWorld.areaPerItem(bill)) * d * d / w }
+
+    static func of(_ size: CGSize, bill: Bool, capacity: Int64) -> BoxGeo? {
+        guard size.width > 0, size.height > 0 else { return nil }
+        let labelW: CGFloat = 34, lid: CGFloat = 8, pad: CGFloat = 6
+        let boxW = size.width - labelW
+        let left = pad, right = boxW - pad, top = lid + pad, bottom = size.height - pad
+        let fit = ((right - left) * (bottom - top) * 0.92 / (CGFloat(capacity) * CGFloat(CoinWorld.areaPerItem(bill)))).squareRoot()
+        let d = min(max(fit, bill ? 9 : 6), 26)
+        return BoxGeo(boxW: boxW, lid: lid, left: left, right: right, top: top, bottom: bottom, d: d, bill: bill)
+    }
 }
 
-// いちばん上の段の数。次の段までの足りない分だけ少なくする
-private func lastRowCount(_ fillH: CGFloat, _ item: CGFloat, _ step: CGFloat, _ r: Int, _ perRow: Int) -> Int {
-    if r == 0 { return fillH >= item ? perRow : max(1, Int((CGFloat(perRow) * fillH / item).rounded())) }
-    let part = min(max((fillH - item - CGFloat(r - 1) * step) / step, 0), 1)
-    return max(1, Int((CGFloat(perRow) * part).rounded()))
-}
+// 物理の箱と、描き直しの合図。画面が開いている間だけ動かす
+@Observable
+private final class PileModel {
+    var tick = 0
+    @ObservationIgnored var world: CoinWorld?
+    @ObservationIgnored var geo: BoxGeo?
+    @ObservationIgnored private let motion = CMMotionManager()
+    @ObservationIgnored private var lastAngle: Float = .nan
 
-// 置き場所（硬貨は中心、お札は左上）。下の段から順に並べる
-private func stack(fillH: CGFloat, left: CGFloat, right: CGFloat, bottom: CGFloat, item: CGFloat, step: CGFloat, w: CGFloat, gap: CGFloat, shiftOdd: CGFloat, bill: Bool) -> [CGPoint] {
-    var out: [CGPoint] = []
-    let rows = stackRows(fillH, item, step)
-    for r in 0..<rows {
-        let shift = r % 2 == 1 ? shiftOdd : 0
-        let perRow = max(1, Int(((right - left - shift + gap) / (w + gap)).rounded(.down)))
-        let n = r == rows - 1 ? lastRowCount(fillH, item, step, r, perRow) : perRow
-        for i in 0..<n {
-            let x = left + shift + CGFloat(i) * (w + gap)
-            out.append(bill ? CGPoint(x: x, y: bottom - item - CGFloat(r) * step) : CGPoint(x: x + w / 2, y: bottom - item / 2 - CGFloat(r) * step))
+    func prepare(_ geo: BoxGeo?) {
+        guard geo != self.geo else { return }
+        self.geo = geo
+        world = geo.map { CoinWorld(width: Float($0.w / $0.d), height: Float($0.h / $0.d), bill: $0.bill) }
+    }
+
+    // 端末の傾き（重力の向き）。机に平らに置いたときは下向きのまま。少しの揺れ（約 7°）は無視
+    func startTilt(_ onTilt: @escaping () -> Void) {
+        guard motion.isDeviceMotionAvailable, !motion.isDeviceMotionActive else { return }
+        motion.deviceMotionUpdateInterval = 1.0 / 30
+        motion.startDeviceMotionUpdates(to: .main) { [weak self] m, _ in
+            guard let self, let g = m?.gravity, let w = self.world else { return }
+            let gx = Float(g.x), gy = Float(g.y)
+            if (gx * gx + gy * gy).squareRoot() < 0.3 { return }
+            let a = atan2(gy, gx)
+            if !self.lastAngle.isNaN && abs(a - self.lastAngle) < 0.12 { return }
+            self.lastAngle = a
+            w.setGravity(gx, gy)
+            onTilt()
         }
     }
-    return out
+
+    func stopTilt() { motion.stopDeviceMotionUpdates() }
 }
 
-// 落ちる動き: はじめは重力のように加速し、底で少しはねる（0 → 1。はねる間だけ少し上に戻る）
-private func fall(_ t: CGFloat) -> CGFloat {
-    if t <= 0 { return 0 }
-    if t < 0.78 { let u = t / 0.78; return u * u }
-    if t < 1 { return 1 - 0.07 * sin(.pi * (t - 0.78) / 0.22) }
-    return 1
-}
-
-// 目標の貯金箱。中身の多さは目標に対する割合、中身の種類は貯まった額（1 万で 100円玉、3 万で 500円玉、10 万で千円札、50 万で万札）
-// 画面を開くと、上から 1 枚ずつ降ってきて積もる（「視差効果を減らす」設定のときは、はじめから積んだ形）
+// 目標の貯金箱。中身は貯金額どおりの枚数（2 万円なら 100円玉 200 枚）。1 万で 100円玉、3 万で 500円玉、10 万で千円札、50 万で万札
+// 中身の大きさは、目標額ちょうどの枚数で箱がいっぱいになるように決める（だから満ち具合 = 目標に対する割合）
+// 物理（Box2D）で、投入口から 1 枚ずつ降ってきて積もる。端末を傾けると転がる。貯金を記録すると増えた分だけ落ちてくる
+// 「視差効果を減らす」設定のときは、はじめから積んだ形
 struct CoinBox: View {
     let name: String
     let saved: Int64
-    let ratio: Double
+    let target: Int64
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var start = Date()
-    @State private var running = true   // 落ちきったら止める（描き直しを続けない）
-    private let duration = 1.8
+    @State private var model = PileModel()
+    @State private var kick = 0
+    @State private var size: CGSize = .zero
+
+    private struct RunKey: Equatable { let geo: BoxGeo?; let count: Int; let kick: Int; let still: Bool }
 
     var body: some View {
-        let idx = Savings.coinIndex(saved), coin = Savings.coins[idx], pct = Int((ratio * 100).rounded())
-        TimelineView(.animation(paused: reduceMotion || !running)) { tl in
-            let p = reduceMotion || !running ? 1 : min(1, max(0, tl.date.timeIntervalSince(start) / duration))
-            Canvas { c, size in draw(c, size, CGFloat(p), idx: idx, bill: coin.bill, pct: pct) }
+        let idx = Savings.coinIndex(saved), coin = Savings.coins[idx]
+        let count = Savings.coinCount(saved), capacity = Savings.coinCapacity(saved, target)
+        let pct = target > 0 ? Int((Double(saved) * 100 / Double(target)).rounded()) : 0
+        let geo = BoxGeo.of(size, bill: coin.bill, capacity: capacity)
+        let tick = model.tick   // 物理が進むたびに描き直す
+        Canvas { c, sz in
+            _ = tick
+            draw(c, sz, idx: idx, pct: pct, capacity: capacity)
         }
         .frame(height: 140)
-        .task(id: saved) {
-            start = Date(); running = true
-            try? await Task.sleep(nanoseconds: UInt64((duration + 0.1) * 1_000_000_000))
-            running = false
-        }
-        .accessibilityElement()
-        .accessibilityLabel("\(name)の貯金箱 \(pct)%・中身は\(coin.name)")
-    }
-
-    private func draw(_ c: GraphicsContext, _ size: CGSize, _ p: CGFloat, idx: Int, bill: Bool, pct: Int) {
-        let labelW: CGFloat = 34, lid: CGFloat = 8, pad: CGFloat = 6
-        let boxW = size.width - labelW, boxH = size.height - lid
-        // 箱と、上の投入口
-        let box = Path(roundedRect: CGRect(x: 0, y: lid, width: boxW, height: boxH), cornerRadius: 8)
-        c.fill(box, with: .color(.kBg))
-        c.stroke(box, with: .color(.kLine), lineWidth: 1.5)
-        c.fill(Path(roundedRect: CGRect(x: boxW / 2 - 20, y: lid - 2, width: 40, height: 4), cornerRadius: 2), with: .color(Color.kInk.opacity(0.6)))
-        let left = pad, right = boxW - pad, bottom = size.height - pad, innerH = boxH - pad * 2 - 4, topY = lid + pad
-        let fillH: CGFloat = saved > 0 ? max(innerH * CGFloat(min(max(ratio, 0), 1)), 1) : 0
-        let d: CGFloat = 20, bw: CGFloat = 50, bh: CGFloat = 30
-        let spots = bill ? stack(fillH: fillH, left: left, right: right, bottom: bottom, item: bh, step: bh * 0.6, w: bw, gap: 0, shiftOdd: bw * 0.5, bill: true)
-                         : stack(fillH: fillH, left: left, right: right, bottom: bottom, item: d, step: d * 0.62, w: d * 0.92, gap: 0, shiftOdd: d * 0.46, bill: false)
-        let frames = (0..<frameCount).map { c.resolve(moneyFrame(idx, $0)) }
-        // 1 枚ずつ、置き場所の真上から降らせる。下の段から順に、少しばらつかせて落とし始める
-        // （全体の 62% の時間で全部が落ち始め、1 枚は 38% の時間で落ちきる）
-        var inner = c
-        inner.clip(to: Path(CGRect(x: left, y: topY, width: right - left, height: bottom - topY)))
-        let n = spots.count
-        for (k, s) in spots.enumerated() {
-            let order: CGFloat = n <= 1 ? 0 : CGFloat(k) / CGFloat(n - 1)
-            let jitter = CGFloat((k * 7919) % 101) / 100
-            let t = (p - 0.62 * (0.75 * order + 0.25 * jitter)) / 0.38
-            if t <= 0 { continue }
-            let f = fall(min(t, 1))
-            // 落ちている間は 1 回転半して、着いたときに置いた姿（0 コマ目）になる。1 枚ごとに回る向きを変える
-            let spin = t >= 0.78 ? 0 : Int((1 - t / 0.78) * CGFloat(frameCount) * 1.5) % frameCount
-            let img = frames[k % 2 == 0 ? spin : (frameCount - spin) % frameCount]
-            if bill {
-                inner.draw(img, in: CGRect(x: s.x, y: (topY - bh) + (s.y - (topY - bh)) * f, width: bw, height: bh))
-            } else {
-                let y = (topY - d / 2) + (s.y - (topY - d / 2)) * f
-                inner.draw(img, in: CGRect(x: s.x - d / 2, y: y - d / 2, width: d, height: d))
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0 }
+        .task(id: RunKey(geo: geo, count: Int(min(count, Int64(CoinWorld.maxBodies))), kick: kick, still: reduceMotion)) {
+            model.prepare(geo)
+            guard let w = model.world else { return }
+            w.setCount(Int(min(count, Int64(CoinWorld.maxBodies))), animate: !reduceMotion)
+            model.tick += 1
+            if reduceMotion { return }
+            var last = ContinuousClock.now
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(16))
+                let now = ContinuousClock.now
+                let dt = Float((now - last) / .seconds(1)); last = now
+                let moving = w.step(dt)
+                model.tick += 1
+                if !moving { break }   // みんな止まったら計算をやめる（電池を使わない）
             }
         }
-        // 25・50・75・100% の目盛り（箱の中は点線、右に数字）
+        .onAppear { if !reduceMotion { model.startTilt { kick += 1 } } }
+        .onDisappear { model.stopTilt() }
+        .accessibilityElement()
+        .accessibilityLabel("\(name)の貯金箱 \(pct)%・\(coin.name) \(count)枚")
+    }
+
+    private func draw(_ c: GraphicsContext, _ size: CGSize, idx: Int, pct: Int, capacity: Int64) {
+        guard let g = model.geo else { return }
+        // 箱と、上の投入口
+        let box = Path(roundedRect: CGRect(x: 0, y: g.lid, width: g.boxW, height: size.height - g.lid), cornerRadius: 8)
+        c.fill(box, with: .color(.kBg))
+        c.stroke(box, with: .color(.kLine), lineWidth: 1.5)
+        c.fill(Path(roundedRect: CGRect(x: g.boxW / 2 - 20, y: g.lid - 2, width: 40, height: 4), cornerRadius: 2), with: .color(Color.kInk.opacity(0.6)))
+        let d = g.d, iw = g.bill ? d * billAspect : d
+        let frames = (0..<frameCount).map { c.resolve(moneyFrame(idx, $0)) }
+        var inner = c
+        inner.clip(to: Path(CGRect(x: g.left, y: g.top, width: g.w, height: g.h)))
+        if let w = model.world {
+            for i in 0..<w.count {
+                let cx = g.left + CGFloat(w.xs[i]) * d, cy = g.bottom - CGFloat(w.ys[i]) * d
+                var ic = inner
+                ic.translateBy(x: cx, y: cy); ic.rotate(by: .radians(-Double(w.angles[i])))
+                ic.draw(frames[w.frames[i]], in: CGRect(x: -iw / 2, y: -d / 2, width: iw, height: d))
+            }
+        }
+        // 25・50・75・100% の目盛り（目標額の何割の枚数を積んだ高さか。箱の中は点線、右に数字）
         for q in [25, 50, 75, 100] {
-            let y = bottom - innerH * CGFloat(q) / 100
-            var l = Path(); l.move(to: CGPoint(x: left, y: y)); l.addLine(to: CGPoint(x: right, y: y))
+            let y = g.pileTop(Double(capacity) * Double(q) / 100)
+            if y < g.top { continue }
+            var l = Path(); l.move(to: CGPoint(x: g.left, y: y)); l.addLine(to: CGPoint(x: g.right, y: y))
             c.stroke(l, with: .color(Color.kSub.opacity(0.45)), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
             c.draw(Text("\(q)%").font(.system(size: 11, weight: pct >= q ? .bold : .regular)).foregroundColor(pct >= q ? .kInk : .kSub),
-                   at: CGPoint(x: boxW + 6, y: y), anchor: .leading)
+                   at: CGPoint(x: g.boxW + 6, y: y), anchor: .leading)
         }
     }
 }
 
-// 段階の並び（10円 → 100円 → 500円 → 千円札 → 万札）。届いた段階は濃く、今の段階は太字
+// 枚数・段階の並び（10円 → 100円 → 500円 → 千円札 → 万札）。届いた段階は濃く、今の段階は太字
 struct CoinSteps: View {
     let saved: Int64
     let done: Bool
     var body: some View {
         let idx = Savings.coinIndex(saved)
         VStack(spacing: 6) {
+            if Savings.coinCount(saved) > 0 {
+                Text(countText).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kInk).multilineTextAlignment(.center)
+            }
             HStack(alignment: .top, spacing: 0) {
                 ForEach(Array(Savings.coins.enumerated()), id: \.offset) { i, coin in
                     VStack(spacing: 1) {
-                        moneyFrame(i, 0).resizable().interpolation(.medium).aspectRatio(contentMode: .fit).frame(width: coin.bill ? 34 : 22, height: 22)
+                        moneyFrame(i, 0).resizable().interpolation(.medium).aspectRatio(contentMode: .fit).frame(width: coin.bill ? 37 : 22, height: 22)
                         Text(coin.short).font(.system(size: 11, weight: i == idx ? .bold : .regular)).foregroundStyle(Color.kInk)
                         Text(coin.from == 0 ? "〜" : "\(coin.from / 10_000)万〜").font(.system(size: 10)).foregroundStyle(Color.kFaint)
                     }
@@ -139,8 +167,17 @@ struct CoinSteps: View {
             }
             Text(message).font(.system(size: 14, weight: done ? .bold : .regular)).foregroundStyle(done ? Color.kAccent : Color.kSub).multilineTextAlignment(.center)
         }
-        .padding(.top, 8)
+        .padding(.top, 6)
         .accessibilityElement(children: .combine)
+    }
+
+    private var countText: String {
+        let coin = Savings.coins[Savings.coinIndex(saved)]
+        let count = Savings.coinCount(saved), rest = Savings.coinRemainder(saved)
+        var t = "\(coin.name) \(count.formatted())枚"
+        if rest > 0 { t += "・端数 \(Money.format(rest))" }
+        if count > Int64(CoinWorld.maxBodies) { t += "（箱には \(CoinWorld.maxBodies.formatted()) 枚まで）" }
+        return t
     }
 
     private var message: String {

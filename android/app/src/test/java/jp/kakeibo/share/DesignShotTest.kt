@@ -55,10 +55,9 @@ class DesignShotTest {
     private fun txn(id: String, day: Int, cat: String, amount: Long, kind: String = "expense", recurring: String? = null, memo: String = "", month: LocalDate) =
         Txn(id, "g", kind, amount, "%04d-%02d-%02d".format(month.year, month.monthValue, day), cat, "m1", memo = memo, recurringId = recurring, createdBy = "u1")
 
-    private fun shot(name: String, advanceMs: Long? = null, content: @androidx.compose.runtime.Composable () -> Unit) {
-        if (advanceMs != null) rule.mainClock.autoAdvance = false   // 動きの途中を撮る
+    private fun shot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
         rule.setContent { KakeiboTheme { Column(Modifier.fillMaxWidth().background(T.bg).verticalScroll(rememberScrollState()).padding(16.dp)) { content() } } }
-        if (advanceMs != null) rule.mainClock.advanceTimeBy(advanceMs) else rule.waitForIdle()
+        rule.waitForIdle()
         val v = rule.activity.window.decorView
         v.measure(View.MeasureSpec.makeMeasureSpec(v.width.coerceAtLeast(1), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(v.height.coerceAtLeast(1), View.MeasureSpec.EXACTLY))
         v.layout(0, 0, v.measuredWidth, v.measuredHeight)
@@ -110,15 +109,10 @@ class DesignShotTest {
 
     @Test fun coinBox() {
         shot("coinbox") {
-            listOf(5_000L to 0.05, 15_000L to 0.3, 60_000L to 0.5, 200_000L to 0.8, 600_000L to 1.0).forEach { (v, r) ->
-                Paper(Modifier.padding(bottom = 10.dp)) { Big(v); CoinBox("目標", v, r, Modifier.padding(top = 8.dp)); CoinSteps(v, r >= 1.0) }
+            // 物理の部品はテストでは読み込めないので、段に並べた形（物理は physicspreview で確かめる）
+            listOf(5_000L to 100_000L, 20_000L to 100_000L, 60_000L to 120_000L, 200_000L to 250_000L, 600_000L to 600_000L).forEach { (v, t) ->
+                Paper(Modifier.padding(bottom = 10.dp)) { Big(v); CoinBox("目標", v, t, Modifier.padding(top = 8.dp)); CoinSteps(v, v >= t) }
             }
-        }
-    }
-
-    @Test fun coinBoxFalling() {
-        shot("coinbox_falling", advanceMs = 900) {
-            listOf(60_000L to 0.5, 200_000L to 0.8).forEach { (v, r) -> Paper(Modifier.padding(bottom = 10.dp)) { CoinBox("目標", v, r) } }
         }
     }
 

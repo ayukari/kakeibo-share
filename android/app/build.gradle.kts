@@ -60,6 +60,7 @@ dependencies {
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
     implementation(libs.biometric)
+    implementation(libs.box2d.android)   // 貯金箱の中の物理（Box2D v3.2）
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

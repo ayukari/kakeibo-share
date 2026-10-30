@@ -5,3 +5,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "KakeiboShare"
 include(":app")
+include(":physicspreview")   // 貯金箱の物理を PC で動かして確かめる（アプリには入らない）

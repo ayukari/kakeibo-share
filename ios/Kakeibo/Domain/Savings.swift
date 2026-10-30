@@ -66,13 +66,19 @@ enum Savings {
     }
 
     // 貯金箱の中身。貯まった額で、硬貨からお札に変わっていく（目標の大きさにかかわらず同じ段階）
-    struct Coin: Hashable { let name: String; let short: String; let from: Int64; let bill: Bool }
+    struct Coin: Hashable { let name: String; let short: String; let from: Int64; let bill: Bool; let face: Int64 }
     static let coins = [
-        Coin(name: "10円玉", short: "10円", from: 0, bill: false), Coin(name: "100円玉", short: "100円", from: 10_000, bill: false),
-        Coin(name: "500円玉", short: "500円", from: 30_000, bill: false), Coin(name: "千円札", short: "千円札", from: 100_000, bill: true),
-        Coin(name: "1万円札", short: "万札", from: 500_000, bill: true),
+        Coin(name: "10円玉", short: "10円", from: 0, bill: false, face: 10), Coin(name: "100円玉", short: "100円", from: 10_000, bill: false, face: 100),
+        Coin(name: "500円玉", short: "500円", from: 30_000, bill: false, face: 500), Coin(name: "千円札", short: "千円札", from: 100_000, bill: true, face: 1_000),
+        Coin(name: "1万円札", short: "万札", from: 500_000, bill: true, face: 10_000),
     ]
     static func coinIndex(_ saved: Int64) -> Int { max(0, coins.lastIndex { saved >= $0.from } ?? 0) }
+    // 箱に入れる枚数（貯金額をその段階の額面で割った数。2 万円なら 100円玉 200 枚）と、額面に満たない端数
+    static func coinCount(_ saved: Int64) -> Int64 { max(0, saved) / coins[coinIndex(saved)].face }
+    static func coinRemainder(_ saved: Int64) -> Int64 { max(0, saved) % coins[coinIndex(saved)].face }
+    // 目標額ちょうどの枚数（箱がいっぱいになる枚数）。中身の大きさを決めるのに使う
+    static func coinCapacity(_ saved: Int64, _ target: Int64) -> Int64 { max(1, target / coins[coinIndex(saved)].face) }
+
     // 次の段階と、そこまでの残り（いちばん上なら nil）
     static func nextCoin(_ saved: Int64) -> (coin: Coin, left: Int64)? {
         let i = coinIndex(saved) + 1

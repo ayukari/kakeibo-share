@@ -156,6 +156,11 @@ class DomainTest {
         assertEquals("千円札" to 1L, Savings.nextCoin(99_999)!!.let { it.first.name to it.second })
         assertNull(Savings.nextCoin(800_000))
         assertEquals(0, Savings.coinIndex(-500))
+        // 箱に入れる枚数は貯金額どおり（2 万円なら 100円玉 200 枚）
+        assertEquals(listOf(500L, 200L, 120L, 200L, 60L), listOf(5_000L, 20_000L, 60_000L, 200_000L, 600_000L).map { Savings.coinCount(it) })
+        assertEquals(50L, Savings.coinRemainder(20_050)); assertEquals(200L, Savings.coinCount(20_050))
+        assertEquals(0L, Savings.coinCount(-100))
+        assertEquals(1_000L, Savings.coinCapacity(20_000, 100_000)); assertEquals(1L, Savings.coinCapacity(20_000, 0))
     }
 
     @Test fun savingsLeftover() {

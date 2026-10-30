@@ -18,3 +18,4 @@ ios/Config/Secrets.xcconfig
 ios/Kakeibo.xcodeproj/
 supabase/.temp/
 supabase/.branches/
+__pycache__/

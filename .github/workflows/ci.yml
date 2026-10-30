@@ -30,7 +30,7 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: "17" }
       - name: テスト・lint・ビルド
-        run: chmod +x gradlew && ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: chmod +x gradlew && ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :physicspreview:test
       - uses: actions/upload-artifact@v4
         if: always()
         with:

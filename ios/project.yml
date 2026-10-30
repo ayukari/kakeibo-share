@@ -9,6 +9,9 @@ packages:
   Supabase:
     url: https://github.com/supabase/supabase-swift
     from: 2.20.0
+  Box2D:   # 貯金箱の中の物理（Box2D v3.2、MIT。公式の Swift Package）
+    url: https://github.com/erincatto/box2d
+    exactVersion: 3.2.0
 settings:
   base:
     SWIFT_VERSION: "5.10"
@@ -41,6 +44,8 @@ targets:
     dependencies:
       - package: Supabase
         product: Supabase
+      - package: Box2D
+        product: box2d
   KakeiboTests:
     type: bundle.unit-test
     platform: iOS

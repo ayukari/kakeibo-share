@@ -160,7 +160,7 @@ fun Envelope(ctx: GroupCtx, g: SavingsGoal, s: SavingsStatus, rows: List<Passboo
             Text(Money.format(s.saved), color = T.ink, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"))
             Text(" / ${Money.format(g.target)}", color = T.sub, fontSize = 14.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
-        CoinBox(g.name, s.saved, s.ratio, Modifier.padding(top = 10.dp))
+        CoinBox(g.name, s.saved, g.target, Modifier.padding(top = 10.dp))
         CoinSteps(s.saved, s.done)
         Sub(Savings.pace(g, s), Modifier.padding(top = 8.dp))
         val ms = Savings.milestone(g.target, rows, today)

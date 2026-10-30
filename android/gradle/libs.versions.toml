@@ -13,6 +13,7 @@ serialization = "1.12.0"
 junit = "4.13.2"
 robolectric = "4.17"
 biometric = "1.1.0"
+box2d = "2.0.0"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -38,9 +39,13 @@ serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serializ
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
+# Box2D v3.2（MIT）の Java の窓口。Android 用は box2dandroid パッケージ、PC 用（物理の確認）は box2d パッケージ
+box2d-android = { group = "de.fabmax.box2d-jni", name = "box2d-jni-android", version.ref = "box2d" }
+box2d-desktop = { group = "de.fabmax.box2d-jni", name = "box2d-jni", version.ref = "box2d" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

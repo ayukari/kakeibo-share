@@ -169,6 +169,11 @@ final class DomainTests: XCTestCase {
         XCTAssertEqual(Savings.nextCoin(99_999)?.coin.name, "千円札"); XCTAssertEqual(Savings.nextCoin(99_999)?.left, 1)
         XCTAssertNil(Savings.nextCoin(800_000))
         XCTAssertEqual(Savings.coinIndex(-500), 0)
+        // 箱に入れる枚数は貯金額どおり（2 万円なら 100円玉 200 枚）
+        XCTAssertEqual([5_000, 20_000, 60_000, 200_000, 600_000].map { Savings.coinCount($0) }, [500, 200, 120, 200, 60])
+        XCTAssertEqual(Savings.coinRemainder(20_050), 50); XCTAssertEqual(Savings.coinCount(20_050), 200)
+        XCTAssertEqual(Savings.coinCount(-100), 0)
+        XCTAssertEqual(Savings.coinCapacity(20_000, 100_000), 1_000); XCTAssertEqual(Savings.coinCapacity(20_000, 0), 1)
     }
 
     func testSavingsLeftover() {

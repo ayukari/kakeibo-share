@@ -176,7 +176,7 @@ struct Envelope: View {
                 Text(Money.format(s.saved)).font(.system(size: 24, weight: .heavy)).monospacedDigit().foregroundStyle(Color.kInk)
                 Text(" / \(Money.format(g.target))").font(.system(size: 14)).foregroundStyle(Color.kSub)
             }
-            CoinBox(name: g.name, saved: s.saved, ratio: s.ratio).padding(.top, 10)
+            CoinBox(name: g.name, saved: s.saved, target: g.target).padding(.top, 10)
             CoinSteps(saved: s.saved, done: s.done)
             SubText(Savings.pace(g, s)).padding(.top, 8)
             if let ms = Savings.milestone(target: g.target, rows: rows, today: today), ms.thisMonth {

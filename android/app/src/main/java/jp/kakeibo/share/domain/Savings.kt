@@ -59,12 +59,18 @@ object Savings {
     }
 
     // 貯金箱の中身。貯まった額で、硬貨からお札に変わっていく（目標の大きさにかかわらず同じ段階）
-    data class Coin(val name: String, val short: String, val from: Long, val bill: Boolean)
+    data class Coin(val name: String, val short: String, val from: Long, val bill: Boolean, val face: Long)
     val COINS = listOf(
-        Coin("10円玉", "10円", 0, false), Coin("100円玉", "100円", 10_000, false), Coin("500円玉", "500円", 30_000, false),
-        Coin("千円札", "千円札", 100_000, true), Coin("1万円札", "万札", 500_000, true),
+        Coin("10円玉", "10円", 0, false, 10), Coin("100円玉", "100円", 10_000, false, 100), Coin("500円玉", "500円", 30_000, false, 500),
+        Coin("千円札", "千円札", 100_000, true, 1_000), Coin("1万円札", "万札", 500_000, true, 10_000),
     )
     fun coinIndex(saved: Long): Int = COINS.indexOfLast { saved >= it.from }.coerceAtLeast(0)
     // 次の段階と、そこまでの残り（いちばん上なら null）
+    // 箱に入れる枚数（貯金額をその段階の額面で割った数。2 万円なら 100円玉 200 枚）と、額面に満たない端数
+    fun coinCount(saved: Long): Long = maxOf(0, saved) / COINS[coinIndex(saved)].face
+    fun coinRemainder(saved: Long): Long = maxOf(0, saved) % COINS[coinIndex(saved)].face
+    // 目標額ちょうどの枚数（箱がいっぱいになる枚数）。中身の大きさを決めるのに使う
+    fun coinCapacity(saved: Long, target: Long): Long = maxOf(1, target / COINS[coinIndex(saved)].face)
+
     fun nextCoin(saved: Long): Pair<Coin, Long>? = COINS.getOrNull(coinIndex(saved) + 1)?.let { it to it.from - saved }
 }
