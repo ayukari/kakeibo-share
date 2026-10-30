@@ -101,7 +101,9 @@ class UiTest {
         rule.onNodeWithTag("cat_食費").performScrollTo().performClick()
         listOf("8", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
         rule.onNodeWithTag("save").performScrollTo().performClick()
-        rule.onNodeWithTag("txnError").assertDoesNotExist()
+        // 入力の誤りが出ないこと（そのあとの送信はテストではサーバーに届かず、通信のエラーが出るかどうかはタイミングしだいなので見ない）
+        rule.onNodeWithText("カテゴリを選んでください").assertDoesNotExist()
+        rule.onNodeWithText("金額は 1 円以上の整数で入れてください").assertDoesNotExist()
     }
 
     @Test fun viewerSeesNoAuditMenu() {
