@@ -1,32 +1,11 @@
 import SwiftUI
 
-// 硬貨・お札の色。本物と見まちがえないよう、肖像や図柄は描かず、色と形だけで表す（通貨及証券模造取締法。財務省の FAQ）
-// 金属と紙の色なので、明るい表示でも暗い表示でも同じ
-private struct CoinLook { let fill: Color; let edge: Color; var inner: Color? = nil }
-private let looks: [CoinLook] = [
-    CoinLook(fill: Color(hex: 0xC2783F), edge: Color(hex: 0x8A4F22)),                              // 10円玉（青銅。赤みのある銅色）
-    CoinLook(fill: Color(hex: 0xCDD1D6), edge: Color(hex: 0x7E848D)),                              // 100円玉（白銅。銀白色）
-    CoinLook(fill: Color(hex: 0xD9B44A), edge: Color(hex: 0x94721A), inner: Color(hex: 0xD5D8DC)), // 500円玉（外側が金色・内側が銀色の 2 色）
-    CoinLook(fill: Color(hex: 0x9DBBDC), edge: Color(hex: 0x4D7199)),                              // 千円札（青系）
-    CoinLook(fill: Color(hex: 0xCDB98F), edge: Color(hex: 0x85703F)),                              // 1万円札（茶系）
-]
-
-private func drawCoin(_ c: GraphicsContext, _ p: CGPoint, _ r: CGFloat, _ look: CoinLook) {
-    func circle(_ rr: CGFloat, _ at: CGPoint) -> Path { Path(ellipseIn: CGRect(x: at.x - rr, y: at.y - rr, width: rr * 2, height: rr * 2)) }
-    c.fill(circle(r, p), with: .color(look.fill))
-    if let inner = look.inner { c.fill(circle(r * 0.62, p), with: .color(inner)) }
-    c.stroke(circle(r, p), with: .color(look.edge), lineWidth: 1.2)
-    c.stroke(circle(r * 0.62, p), with: .color(look.edge.opacity(0.55)), lineWidth: 0.8)
-    c.fill(circle(r * 0.26, CGPoint(x: p.x - r * 0.35, y: p.y - r * 0.35)), with: .color(.white.opacity(0.35)))
-}
-
-private func drawBill(_ c: GraphicsContext, _ rect: CGRect, _ look: CoinLook) {
-    let shape = Path(roundedRect: rect, cornerRadius: 2)
-    c.fill(shape, with: .color(look.fill))
-    c.stroke(shape, with: .color(look.edge), lineWidth: 1)
-    c.stroke(Path(rect.insetBy(dx: 3, dy: 3)), with: .color(look.edge.opacity(0.45)), lineWidth: 0.8)
-    c.stroke(Path(ellipseIn: CGRect(x: rect.minX + rect.width * 0.6, y: rect.minY + rect.height * 0.24, width: rect.width * 0.22, height: rect.height * 0.52)),
-             with: .color(look.edge.opacity(0.5)), lineWidth: 0.8)
+// 硬貨・お札の絵。Blender で作った 3D を描き出したもの（tools/render3d/money_sprites.py。Resources/Money）
+// 本物と見まちがえないよう、肖像や図柄は描かず、色・金属の質感・形だけ（通貨及証券模造取締法。財務省の FAQ）
+// 段階ごとに 8 コマ。0 コマ目が置いたときの姿で、1〜7 コマ目は横の軸で 45° ずつ回した姿（落ちながら回る）
+private let frameCount = 8
+private func moneyFrame(_ tier: Int, _ f: Int) -> Image {
+    Image(uiImage: UIImage(named: "money_t\(tier)_f\(f)") ?? UIImage())
 }
 
 // 積んだ高さ（いちばん上の段の上端）が fillH をこえない段の数。少しでも貯まっていれば 1 段
@@ -95,7 +74,6 @@ struct CoinBox: View {
     }
 
     private func draw(_ c: GraphicsContext, _ size: CGSize, _ p: CGFloat, idx: Int, bill: Bool, pct: Int) {
-        let look = looks[idx]
         let labelW: CGFloat = 34, lid: CGFloat = 8, pad: CGFloat = 6
         let boxW = size.width - labelW, boxH = size.height - lid
         // 箱と、上の投入口
@@ -105,9 +83,10 @@ struct CoinBox: View {
         c.fill(Path(roundedRect: CGRect(x: boxW / 2 - 20, y: lid - 2, width: 40, height: 4), cornerRadius: 2), with: .color(Color.kInk.opacity(0.6)))
         let left = pad, right = boxW - pad, bottom = size.height - pad, innerH = boxH - pad * 2 - 4, topY = lid + pad
         let fillH: CGFloat = saved > 0 ? max(innerH * CGFloat(min(max(ratio, 0), 1)), 1) : 0
-        let d: CGFloat = 18, bw: CGFloat = 50, bh: CGFloat = 24
-        let spots = bill ? stack(fillH: fillH, left: left, right: right, bottom: bottom, item: bh, step: bh * 0.62, w: bw, gap: 4, shiftOdd: bw * 0.3, bill: true)
-                         : stack(fillH: fillH, left: left, right: right, bottom: bottom, item: d, step: d * 0.82, w: d, gap: 0, shiftOdd: d / 2, bill: false)
+        let d: CGFloat = 20, bw: CGFloat = 50, bh: CGFloat = 30
+        let spots = bill ? stack(fillH: fillH, left: left, right: right, bottom: bottom, item: bh, step: bh * 0.6, w: bw, gap: 0, shiftOdd: bw * 0.5, bill: true)
+                         : stack(fillH: fillH, left: left, right: right, bottom: bottom, item: d, step: d * 0.62, w: d * 0.92, gap: 0, shiftOdd: d * 0.46, bill: false)
+        let frames = (0..<frameCount).map { c.resolve(moneyFrame(idx, $0)) }
         // 1 枚ずつ、置き場所の真上から降らせる。下の段から順に、少しばらつかせて落とし始める
         // （全体の 62% の時間で全部が落ち始め、1 枚は 38% の時間で落ちきる）
         var inner = c
@@ -119,15 +98,14 @@ struct CoinBox: View {
             let t = (p - 0.62 * (0.75 * order + 0.25 * jitter)) / 0.38
             if t <= 0 { continue }
             let f = fall(min(t, 1))
+            // 落ちている間は 1 回転半して、着いたときに置いた姿（0 コマ目）になる。1 枚ごとに回る向きを変える
+            let spin = t >= 0.78 ? 0 : Int((1 - t / 0.78) * CGFloat(frameCount) * 1.5) % frameCount
+            let img = frames[k % 2 == 0 ? spin : (frameCount - spin) % frameCount]
             if bill {
-                let y = (topY - bh) + (s.y - (topY - bh)) * f
-                let tilt = (1 - min(max(t / 0.78, 0), 1)) * (k % 2 == 0 ? 12 : -12)   // 落ちながら水平に戻る
-                var g = inner
-                g.translateBy(x: s.x + bw / 2, y: y + bh / 2); g.rotate(by: .degrees(Double(tilt))); g.translateBy(x: -(s.x + bw / 2), y: -(y + bh / 2))
-                drawBill(g, CGRect(x: s.x, y: y, width: bw, height: bh), look)
+                inner.draw(img, in: CGRect(x: s.x, y: (topY - bh) + (s.y - (topY - bh)) * f, width: bw, height: bh))
             } else {
                 let y = (topY - d / 2) + (s.y - (topY - d / 2)) * f
-                drawCoin(inner, CGPoint(x: s.x, y: y), d / 2 - 0.5, look)
+                inner.draw(img, in: CGRect(x: s.x - d / 2, y: y - d / 2, width: d, height: d))
             }
         }
         // 25・50・75・100% の目盛り（箱の中は点線、右に数字）
@@ -151,10 +129,7 @@ struct CoinSteps: View {
             HStack(alignment: .top, spacing: 0) {
                 ForEach(Array(Savings.coins.enumerated()), id: \.offset) { i, coin in
                     VStack(spacing: 1) {
-                        Canvas { c, size in
-                            if coin.bill { drawBill(c, CGRect(x: 1, y: 3, width: size.width - 2, height: size.height - 6), looks[i]) }
-                            else { drawCoin(c, CGPoint(x: size.width / 2, y: size.height / 2), size.height / 2 - 1, looks[i]) }
-                        }.frame(width: 28, height: 18)
+                        moneyFrame(i, 0).resizable().interpolation(.medium).aspectRatio(contentMode: .fit).frame(width: coin.bill ? 34 : 22, height: 22)
                         Text(coin.short).font(.system(size: 11, weight: i == idx ? .bold : .regular)).foregroundStyle(Color.kInk)
                         Text(coin.from == 0 ? "〜" : "\(coin.from / 10_000)万〜").font(.system(size: 10)).foregroundStyle(Color.kFaint)
                     }

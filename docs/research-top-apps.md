@@ -150,3 +150,8 @@ Google Play で「家計簿」を検索した上位から、ダウンロード�
 - 動かし方の候補:
   1. 描き出した画像を、今の「降ってくる」動きにそのまま使う（軽い。Android と iOS で同じ見た目）。回転のコマ（数枚）も描き出せば、くるくる回りながら落ちる。
   2. アプリの中で 3D を動かす: Android は [SceneView](https://github.com/SceneView/sceneview-android)（Apache-2.0、★1.4k。Google の [Filament](https://github.com/google/filament) の上）、iOS は標準の SceneKit・RealityKit（物理演算あり）。本物の物理で落とせるが、アプリが重くなり、Android と iOS で作りが別々になる。
+
+## 取り入れたもの（2026-10-30）
+
+- 貯金箱の中身を、Blender で作った 3D の画像に変えた（`tools/render3d/money_sprites.py` で描き出し。Android は `res/drawable-nodpi/money_t{段階}_f{コマ}.png`、iOS は `Resources/Money`）。段階ごとに 8 コマで、0 コマ目が置いた姿、1〜7 コマ目は 45° ずつ回した姿。
+- 降ってくるとき、1 枚ずつ 1 回転半しながら落ち、着いたときに置いた姿になる。札束の表と裏は札の色、あいだは紙の縁の色。

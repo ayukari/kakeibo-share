@@ -17,11 +17,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -31,42 +33,39 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import jp.kakeibo.share.R
 import jp.kakeibo.share.domain.Money
 import jp.kakeibo.share.domain.Savings
 import kotlin.math.ceil
 import kotlin.math.PI
 import kotlin.math.floor
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
-// 硬貨・お札の色。本物と見まちがえないよう、肖像や図柄は描かず、色と形だけで表す（通貨及証券模造取締法。財務省の FAQ）
-// 金属と紙の色なので、明るい表示でも暗い表示でも同じ
-private class CoinLook(val fill: Color, val edge: Color, val inner: Color? = null)
-private val LOOKS = listOf(
-    CoinLook(Color(0xFFC2783F), Color(0xFF8A4F22)),                       // 10円玉（青銅。赤みのある銅色）
-    CoinLook(Color(0xFFCDD1D6), Color(0xFF7E848D)),                       // 100円玉（白銅。銀白色）
-    CoinLook(Color(0xFFD9B44A), Color(0xFF94721A), Color(0xFFD5D8DC)),    // 500円玉（外側が金色・内側が銀色の 2 色）
-    CoinLook(Color(0xFF9DBBDC), Color(0xFF4D7199)),                       // 千円札（青系）
-    CoinLook(Color(0xFFCDB98F), Color(0xFF85703F)),                       // 1万円札（茶系）
+// 硬貨・お札の絵。Blender で作った 3D を描き出したもの（tools/render3d/money_sprites.py）
+// 本物と見まちがえないよう、肖像や図柄は描かず、色・金属の質感・形だけ（通貨及証券模造取締法。財務省の FAQ）
+// 段階ごとに 8 コマ。0 コマ目が置いたときの姿で、1〜7 コマ目は横の軸で 45° ずつ回した姿（落ちながら回る）
+private val FRAME_IDS = arrayOf(
+    intArrayOf(R.drawable.money_t0_f0, R.drawable.money_t0_f1, R.drawable.money_t0_f2, R.drawable.money_t0_f3, R.drawable.money_t0_f4, R.drawable.money_t0_f5, R.drawable.money_t0_f6, R.drawable.money_t0_f7),
+    intArrayOf(R.drawable.money_t1_f0, R.drawable.money_t1_f1, R.drawable.money_t1_f2, R.drawable.money_t1_f3, R.drawable.money_t1_f4, R.drawable.money_t1_f5, R.drawable.money_t1_f6, R.drawable.money_t1_f7),
+    intArrayOf(R.drawable.money_t2_f0, R.drawable.money_t2_f1, R.drawable.money_t2_f2, R.drawable.money_t2_f3, R.drawable.money_t2_f4, R.drawable.money_t2_f5, R.drawable.money_t2_f6, R.drawable.money_t2_f7),
+    intArrayOf(R.drawable.money_t3_f0, R.drawable.money_t3_f1, R.drawable.money_t3_f2, R.drawable.money_t3_f3, R.drawable.money_t3_f4, R.drawable.money_t3_f5, R.drawable.money_t3_f6, R.drawable.money_t3_f7),
+    intArrayOf(R.drawable.money_t4_f0, R.drawable.money_t4_f1, R.drawable.money_t4_f2, R.drawable.money_t4_f3, R.drawable.money_t4_f4, R.drawable.money_t4_f5, R.drawable.money_t4_f6, R.drawable.money_t4_f7),
 )
+private const val FRAMES = 8
 
-private fun DrawScope.coin(c: Offset, r: Float, look: CoinLook) {
-    drawCircle(look.fill, r, c)
-    look.inner?.let { drawCircle(it, r * 0.62f, c) }
-    drawCircle(look.edge, r, c, style = Stroke(1.2.dp.toPx()))
-    drawCircle(look.edge.copy(alpha = 0.55f), r * 0.62f, c, style = Stroke(0.8.dp.toPx()))
-    drawCircle(Color.White.copy(alpha = 0.35f), r * 0.26f, Offset(c.x - r * 0.35f, c.y - r * 0.35f))
+@Composable
+private fun moneyFrames(tier: Int): List<ImageBitmap> {
+    val res = LocalContext.current.resources
+    return remember(tier) { FRAME_IDS[tier].map { ImageBitmap.imageResource(res, it) } }
 }
 
-private fun DrawScope.bill(tl: Offset, s: Size, look: CoinLook) {
-    val cr = CornerRadius(2.dp.toPx())
-    drawRoundRect(look.fill, tl, s, cr)
-    drawRoundRect(look.edge, tl, s, cr, style = Stroke(1.dp.toPx()))
-    val inset = 3.dp.toPx()
-    drawRect(look.edge.copy(alpha = 0.45f), Offset(tl.x + inset, tl.y + inset), Size(s.width - inset * 2, s.height - inset * 2), style = Stroke(0.8.dp.toPx()))
-    drawOval(look.edge.copy(alpha = 0.5f), Offset(tl.x + s.width * 0.6f, tl.y + s.height * 0.24f), Size(s.width * 0.22f, s.height * 0.52f), style = Stroke(0.8.dp.toPx()))
-}
+private fun DrawScope.sprite(img: ImageBitmap, tl: Offset, w: Float, h: Float) =
+    drawImage(img, dstOffset = IntOffset(tl.x.roundToInt(), tl.y.roundToInt()), dstSize = IntSize(w.roundToInt(), h.roundToInt()), filterQuality = FilterQuality.Medium)
 
 // 積んだ高さ（いちばん上の段の上端）が fillH をこえない段の数。少しでも貯まっていれば 1 段
 private fun stackRows(fillH: Float, item: Float, step: Float): Int = when {
@@ -112,7 +111,7 @@ private fun fall(t: Float): Float = when {
 fun CoinBox(name: String, saved: Long, ratio: Double, modifier: Modifier = Modifier) {
     val idx = Savings.coinIndex(saved)
     val coin = Savings.COINS[idx]
-    val look = LOOKS[idx]
+    val frames = moneyFrames(idx)
     val bg = T.bg; val line = T.line; val ink = T.ink; val sub = T.sub
     val measurer = rememberTextMeasurer()
     val pct = Math.round(ratio * 100)
@@ -130,9 +129,9 @@ fun CoinBox(name: String, saved: Long, ratio: Double, modifier: Modifier = Modif
         drawRoundRect(ink.copy(alpha = 0.6f), Offset(boxW / 2 - 20.dp.toPx(), lid - 2.dp.toPx()), Size(40.dp.toPx(), 4.dp.toPx()), CornerRadius(2.dp.toPx()))
         val left = pad; val right = boxW - pad; val bottom = size.height - pad; val innerH = boxH - pad * 2 - 4.dp.toPx()
         val fillH = if (saved > 0) maxOf(innerH * shown, 1f) else 0f
-        val d = 18.dp.toPx(); val bw = 50.dp.toPx(); val bh = 24.dp.toPx()
-        val spots = if (coin.bill) stack(fillH, left, right, bottom, bh, bh * 0.62f, bw, 4.dp.toPx(), bw * 0.3f, true)
-            else stack(fillH, left, right, bottom, d, d * 0.82f, d, 0f, d / 2, false)
+        val d = 20.dp.toPx(); val bw = 50.dp.toPx(); val bh = 30.dp.toPx()
+        val spots = if (coin.bill) stack(fillH, left, right, bottom, bh, bh * 0.6f, bw, 0f, bw * 0.5f, true)
+            else stack(fillH, left, right, bottom, d, d * 0.62f, d * 0.92f, 0f, d * 0.46f, false)
         // 1 枚ずつ、置き場所の真上から降らせる。下の段から順に、少しばらつかせて落とし始める
         // （全体の 62% の時間で全部が落ち始め、1 枚は 38% の時間で落ちきる）
         val p = progress.value; val n = spots.size; val topY = lid + pad
@@ -143,13 +142,13 @@ fun CoinBox(name: String, saved: Long, ratio: Double, modifier: Modifier = Modif
                 val t = (p - 0.62f * (0.75f * order + 0.25f * jitter)) / 0.38f
                 if (t <= 0f) return@forEachIndexed
                 val f = fall(t.coerceAtMost(1f))
-                if (coin.bill) {
-                    val y = (topY - bh) + (s.y - (topY - bh)) * f
-                    val tilt = (1f - (t / 0.78f).coerceIn(0f, 1f)) * (if (k % 2 == 0) 12f else -12f)   // 落ちながら水平に戻る
-                    rotate(tilt, Offset(s.x + bw / 2, y + bh / 2)) { bill(Offset(s.x, y), Size(bw, bh), look) }
-                } else {
+                // 落ちている間は 1 回転半して、着いたときに置いた姿（0 コマ目）になる。1 枚ごとに回る向きを変える
+                val spin = if (t >= 0.78f) 0 else ((1f - t / 0.78f) * FRAMES * 1.5f).toInt() % FRAMES
+                val img = frames[if (k % 2 == 0) spin else (FRAMES - spin) % FRAMES]
+                if (coin.bill) sprite(img, Offset(s.x, (topY - bh) + (s.y - (topY - bh)) * f), bw, bh)
+                else {
                     val y = (topY - d / 2) + (s.y - (topY - d / 2)) * f
-                    coin(Offset(s.x, y), d / 2 - 0.5.dp.toPx(), look)
+                    sprite(img, Offset(s.x - d / 2, y - d / 2), d, d)
                 }
             }
         }
@@ -169,11 +168,11 @@ fun CoinSteps(saved: Long, done: Boolean) {
     val idx = Savings.coinIndex(saved)
     Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
         Savings.COINS.forEachIndexed { i, c ->
-            val look = LOOKS[i]
+            val img = moneyFrames(i)[0]
             Column(Modifier.weight(1f).alpha(if (i <= idx) 1f else 0.35f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Canvas(Modifier.size(28.dp, 18.dp)) {
-                    if (c.bill) bill(Offset(1.dp.toPx(), 3.dp.toPx()), Size(size.width - 2.dp.toPx(), size.height - 6.dp.toPx()), look)
-                    else coin(center, size.height / 2 - 1.dp.toPx(), look)
+                Canvas(Modifier.size(if (c.bill) 34.dp else 22.dp, 22.dp)) {
+                    val h = if (c.bill) size.width * 0.6f else size.height
+                    sprite(img, Offset(0f, (size.height - h) / 2), size.width, h)
                 }
                 Text(c.short, color = T.ink, fontSize = 11.sp, fontWeight = if (i == idx) FontWeight.Bold else FontWeight.Normal, textAlign = TextAlign.Center)
                 Text(if (c.from == 0L) "〜" else "${c.from / 10_000}万〜", color = T.faint, fontSize = 10.sp, textAlign = TextAlign.Center)
