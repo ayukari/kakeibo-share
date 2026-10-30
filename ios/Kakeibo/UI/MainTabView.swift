@@ -141,7 +141,7 @@ struct DashboardContent: View {
             if !d.sum.byCategory.isEmpty {
                 SectionLabel(text: "カテゴリ")
                 Paper(padding: 12) {
-                    let sorted = d.sum.byCategory.sorted { $0.amount > $1.amount }
+                    let sorted = d.sum.byCategory.filter { $0.amount > 0 }.sorted { $0.amount > $1.amount }
                     ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.cat(a.categoryId)?.name ?? "不明", colorHex: ctx.cat(a.categoryId)?.color, amount: a.amount, max: sorted[0].amount) }
                 }
             }
@@ -178,7 +178,7 @@ struct BudgetPaper: View {
         } else {
             let catRows = d.budgets.filter { $0.scope == "group" && $0.categoryId != nil }
             let rows = catRows.isEmpty ? d.budgets.filter { $0.scope == "group" && $0.categoryId == nil } : catRows
-            let total = rows.reduce(Int64(0)) { $0 + $1.amount }, spent = rows.reduce(Int64(0)) { $0 + $1.spent }, left = total - spent
+            let total = rows.reduce(Int64(0)) { $0 + $1.available }, spent = rows.reduce(Int64(0)) { $0 + $1.spent }, left = total - spent
             let daysLeft = Insights.daysLeft(month: month, today: Money.todayJST())
             Paper {
                 Text("予算の残り").font(.system(size: 14)).foregroundStyle(Color.kSub)
@@ -257,11 +257,16 @@ struct BudgetRow: View {
                 if b.categoryId != nil { CategoryDot(name: name, colorHex: ctx.cat(b.categoryId)?.color, size: 14) }
                 Text(name).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kInk)
                 Spacer()
-                Text("\(Money.format(b.spent)) / \(Money.format(b.amount))").font(.system(size: 14)).monospacedDigit().foregroundStyle(Color.kSub)
+                Text("\(Money.format(b.spent)) / \(Money.format(b.available))").font(.system(size: 14)).monospacedDigit().foregroundStyle(Color.kSub)
             }
+            if b.rolls { FaintText(carryText).padding(.top, 2) }
             Meter(ratio: b.ratio, color: b.over ? .kDanger : .kAccent, tick: tick).padding(.top, 6)
             FaintText(b.remaining >= 0 ? "あと \(Money.format(b.remaining))" : "\(Money.format(-b.remaining)) こえています").padding(.top, 4)
         }.padding(.vertical, 10).accessibilityElement(children: .combine)
+    }
+    private var carryText: String {
+        if b.carried == 0 { return "毎月 \(Money.format(b.amount))・余りは翌月に回す" }
+        return "毎月 \(Money.format(b.amount))・先月から \(b.carried > 0 ? "+" : "")\(Money.format(b.carried))"
     }
 }
 
@@ -270,8 +275,10 @@ struct TxnRow: View {
     let t: Txn
     var body: some View {
         let c = ctx.cat(t.categoryId)
-        let sub = "\(t.occurredOn.dropFirst(5).replacingOccurrences(of: "-", with: "/"))・\(ctx.memberName(t.payerMemberId))が払った" + (t.splitMode != "none" ? "・割り勘" : "") + (t.visibility == "private" ? "・自分だけ" : "")
-        ItemRow(title: (c?.name ?? "不明") + (t.memo.isEmpty ? "" : "・\(t.memo)"), sub: sub, amount: (t.kind == "income" ? "+" : "") + Money.format(t.amount), catName: c?.name, catColor: c?.color)
+        let who: String = ctx.memberName(t.payerMemberId) + (t.refund ? "が受け取った返金" : "が払った")
+        let tags: String = (t.splitMode != "none" ? "・割り勘" : "") + (t.visibility == "private" ? "・自分だけ" : "")
+        let sub = "\(t.occurredOn.dropFirst(5).replacingOccurrences(of: "-", with: "/"))・\(who)\(tags)"
+        ItemRow(title: (c?.name ?? "不明") + (t.memo.isEmpty ? "" : "・\(t.memo)"), sub: sub, amount: (t.kind == "income" || t.refund ? "+" : "") + Money.format(t.amount), catName: c?.name, catColor: c?.color)
     }
 }
 

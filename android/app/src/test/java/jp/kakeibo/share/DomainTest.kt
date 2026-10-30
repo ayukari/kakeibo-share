@@ -155,6 +155,20 @@ class DomainTest {
         assertEquals(6000L, Savings.leftover(listOf(b("c1", 40000, 36000), b("c2", 5000, 3000), b(null, 99999, 0))))
         assertNull(Savings.leftover(listOf(b("c1", 10000, 12000))))
         assertNull(Savings.leftover(emptyList()))
+        // 翌月に繰り越す予算の余りは貯金に回さない
+        val roll = BudgetStatus("b", "group", "c1", null, 40000, 36000, 4000, 0.9, false, carry = 0, rollover = true)
+        assertEquals(2000L, Savings.leftover(listOf(roll, b("c2", 5000, 3000))))
+        assertNull(Savings.leftover(listOf(roll)))
+    }
+
+    @Test fun refundsReduceSpending() {
+        val m = YearMonth.of(2026, 10)
+        val t = listOf(tx(1, 1000), tx(2, 300).copy(isRefund = true), tx(3, 500, recurring = "r"), tx(3, 100, recurring = "r").copy(isRefund = true))
+        val c = Insights.variableCumulative(t, m)
+        assertEquals(1000L, c[0]); assertEquals(700L, c[1]); assertEquals(700L, c[30])
+        assertEquals(-300L, Insights.dailyExpense(t, m)[1])
+        assertEquals(400L, Insights.fixedTotal(t, m))
+        assertEquals(-300L, t[1].signed)
     }
 
     @Test fun calculatorKeypad() {

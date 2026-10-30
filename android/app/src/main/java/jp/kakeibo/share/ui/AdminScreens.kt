@@ -390,7 +390,7 @@ object Csv {
     fun transactions(list: List<Txn>, splits: Map<String, List<Split>>, cat: (String) -> String, member: (String?) -> String, pm: (String?) -> String): String = buildString {
         append(row(HEADER)).append("\r\n")
         list.sortedBy { it.occurredOn }.forEach { t ->
-            append(row(listOf(t.occurredOn, if (t.kind == "income") "収入" else "支出", t.amount.toString(), cat(t.categoryId), member(t.payerMemberId), pm(t.paymentMethodId), t.memo,
+            append(row(listOf(t.occurredOn, if (t.kind == "income") "収入" else if (t.isRefund) "返金" else "支出", t.amount.toString(), cat(t.categoryId), member(t.payerMemberId), pm(t.paymentMethodId), t.memo,
                 if (t.visibility == "private") "自分だけ" else "グループ", when (t.splitMode) { "equal" -> "均等"; "custom" -> "指定"; else -> "" },
                 splits[t.id].orEmpty().joinToString(" ") { "${member(it.memberId)}:${it.amount}" }, t.id))).append("\r\n")
         }

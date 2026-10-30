@@ -221,7 +221,7 @@ fun DashboardContent(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean, o
                     if (d.sum.byCategory.isNotEmpty()) {
                         SectionLabel("カテゴリ")
                         Paper(padding = 12.dp) {
-                            val sorted = d.sum.byCategory.sortedByDescending { it.amount }
+                            val sorted = d.sum.byCategory.filter { it.amount > 0 }.sortedByDescending { it.amount }
                             sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount) }
                         }
                     }
@@ -249,7 +249,7 @@ private fun BudgetPaper(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean
     // カテゴリの予算があればその合計、なければ全体の予算
     val catRows = d.budgets.filter { it.scope == "group" && it.categoryId != null }
     val rows = if (catRows.isNotEmpty()) catRows else d.budgets.filter { it.scope == "group" && it.categoryId == null }
-    val total = rows.sumOf { it.amount }; val spent = rows.sumOf { it.spent }; val left = total - spent
+    val total = rows.sumOf { it.available }; val spent = rows.sumOf { it.spent }; val left = total - spent
     val daysLeft = Insights.daysLeft(ym, today)
     Paper {
         Label("予算の残り")
@@ -322,8 +322,8 @@ private fun LegendItem(c: Color, text: String) {
 @Composable
 fun TxnRow(ctx: GroupCtx, t: Txn, onClick: () -> Unit) {
     val c = ctx.cat(t.categoryId)
-    val sub = "${t.occurredOn.substring(5).replace('-', '/')}・${ctx.memberName(t.payerMemberId)}が払った" + (if (t.splitMode != "none") "・割り勘" else "") + (if (t.visibility == "private") "・自分だけ" else "")
-    ItemRow((c?.name ?: "不明") + (if (t.memo.isNotBlank()) "・${t.memo}" else ""), sub, (if (t.kind == "income") "+" else "") + Money.format(t.amount), c?.name, c?.color, onClick = onClick)
+    val sub = "${t.occurredOn.substring(5).replace('-', '/')}・${ctx.memberName(t.payerMemberId)}" + (if (t.isRefund) "が受け取った返金" else "が払った") + (if (t.splitMode != "none") "・割り勘" else "") + (if (t.visibility == "private") "・自分だけ" else "")
+    ItemRow((c?.name ?: "不明") + (if (t.memo.isNotBlank()) "・${t.memo}" else ""), sub, (if (t.kind == "income" || t.isRefund) "+" else "") + Money.format(t.amount), c?.name, c?.color, onClick = onClick)
 }
 
 // ---------- その他 ----------

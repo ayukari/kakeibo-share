@@ -49,9 +49,10 @@ object Savings {
     }
 
     // 予算の余り（先月のカテゴリの予算、なければ全体の予算の残り）。余りがなければ null
+    // 翌月に繰り越す予算の余りは、貯金に回さない（二重に使わないため）
     fun leftover(budgetRows: List<jp.kakeibo.share.data.BudgetStatus>): Long? {
-        val cat = budgetRows.filter { it.scope == "group" && it.categoryId != null }
-        val rows = cat.ifEmpty { budgetRows.filter { it.scope == "group" && it.categoryId == null } }
+        val cat = budgetRows.filter { it.scope == "group" && it.categoryId != null && !it.rollover }
+        val rows = cat.ifEmpty { budgetRows.filter { it.scope == "group" && it.categoryId == null && !it.rollover } }
         if (rows.isEmpty()) return null
         val left = rows.sumOf { it.amount } - rows.sumOf { it.spent }
         return if (left > 0) left else null

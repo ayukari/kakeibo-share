@@ -7,6 +7,8 @@ migrations: OK
 PASS t_01_access.sql
 PASS t_02_money.sql
 PASS t_03_privileges.sql
+PASS t_04_savings.sql
+PASS t_05_refund_rollover.sql
 ```
 t_03 は、Supabase の既定の権限のせいで内部用の関数（`_write_splits` など）を利用者が直接呼べる穴を見つけて、`20261028000400_privileges.sql` で塞いだあとに通ったもの。
 

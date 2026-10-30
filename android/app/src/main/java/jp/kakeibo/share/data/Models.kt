@@ -51,7 +51,10 @@ import kotlinx.serialization.json.JsonElement
     @SerialName("updated_at") val updatedAt: String? = null,
     val version: Int = 1,
     @SerialName("recurring_id") val recurringId: String? = null,
-)
+    @SerialName("is_refund") val isRefund: Boolean = false,   // 返金（支出だけ。集計と立替では引く）
+) {
+    val signed: Long get() = if (isRefund) -amount else amount
+}
 
 @Serializable data class Split(@SerialName("transaction_id") val transactionId: String, @SerialName("member_id") val memberId: String, val amount: Long)
 
@@ -88,6 +91,7 @@ import kotlinx.serialization.json.JsonElement
     @SerialName("start_month") val startMonth: String,
     @SerialName("end_month") val endMonth: String? = null,
     val amount: Long,
+    val rollover: Boolean = false,
 )
 
 @Serializable data class BudgetStatus(
@@ -97,7 +101,10 @@ import kotlinx.serialization.json.JsonElement
     @SerialName("member_id") val memberId: String? = null,
     val amount: Long, val spent: Long, val remaining: Long,
     val ratio: Double, val over: Boolean,
-)
+    val carry: Long = 0, val rollover: Boolean = false,   // 前の月からの繰り越し（余りは +、使いすぎは −）
+) {
+    val available: Long get() = amount + carry
+}
 
 @Serializable data class AmountBy(@SerialName("category_id") val categoryId: String? = null, @SerialName("member_id") val memberId: String? = null, val amount: Long)
 
@@ -176,6 +183,7 @@ data class TxnInput(
     val splitMode: String,
     val equalMembers: List<String> = emptyList(),
     val customShares: Map<String, Long> = emptyMap(),
+    val isRefund: Boolean = false,
 )
 
 // ---------- 貯金（目標＝封筒・記録＝通帳） ----------

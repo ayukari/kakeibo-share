@@ -94,6 +94,17 @@ final class DomainTests: XCTestCase {
         XCTAssertEqual(MemberView.grouped("ABCDEFGHJKLM"), "ABCD-EFGH-JKLM")
     }
 
+    func testRefundsReduceSpending() {
+        let m = Money.date("2026-10-01")!
+        var r1 = tx(2, 300); r1.isRefund = true
+        var r2 = tx(3, 100, recurring: "r"); r2.isRefund = true
+        let t = [tx(1, 1000), r1, tx(3, 500, recurring: "r"), r2]
+        let c = Insights.variableCumulative(t, month: m)
+        XCTAssertEqual(c[0], 1000); XCTAssertEqual(c[1], 700); XCTAssertEqual(c[30], 700)
+        XCTAssertEqual(Insights.fixedTotal(t, month: m), 400)
+        XCTAssertEqual(r1.signed, -300)
+    }
+
     private func tx(_ day: Int, _ amount: Int64, kind: String = "expense", recurring: String? = nil, vis: String = "group", month: String = "2026-10") -> Txn {
         Txn(id: "t" + String(day) + "-" + String(amount), groupId: "g", kind: kind, amount: amount, occurredOn: month + "-" + String(format: "%02d", day), categoryId: "c", payerMemberId: "m", visibility: vis, recurringId: recurring)
     }
@@ -159,6 +170,10 @@ final class DomainTests: XCTestCase {
         XCTAssertEqual(Savings.leftover([b("c1", 40000, 36000), b("c2", 5000, 3000), b(nil, 99999, 0)]), 6000)
         XCTAssertNil(Savings.leftover([b("c1", 10000, 12000)]))
         XCTAssertNil(Savings.leftover([]))
+        // 翌月に繰り越す予算の余りは貯金に回さない
+        let roll = BudgetStatus(budgetId: "b", scope: "group", categoryId: "c1", memberId: nil, amount: 40000, spent: 36000, remaining: 4000, ratio: 0.9, over: false, carry: 0, rollover: true)
+        XCTAssertEqual(Savings.leftover([roll, b("c2", 5000, 3000)]), 2000)
+        XCTAssertNil(Savings.leftover([roll]))
     }
 
     func testCalculatorKeypad() {

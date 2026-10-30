@@ -139,7 +139,7 @@ struct ReportView: View {
                     if d.sum.byCategory.isEmpty { Paper { SubText("この月の支出はありません") } }
                     else {
                         Paper(padding: 12) {
-                            let sorted = d.sum.byCategory.sorted { $0.amount > $1.amount }
+                            let sorted = d.sum.byCategory.filter { $0.amount > 0 }.sorted { $0.amount > $1.amount }
                             Donut(slices: sorted.map { DonutSlice(label: ctx.cat($0.categoryId)?.name ?? "不明", colorHex: ctx.cat($0.categoryId)?.color, amount: $0.amount) }, centerLabel: "支出", centerValue: d.sum.expense)
                             ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.cat(a.categoryId)?.name ?? "不明", colorHex: ctx.cat(a.categoryId)?.color, amount: a.amount, max: sorted[0].amount) }
                         }
@@ -174,6 +174,7 @@ struct BudgetView: View {
     @State private var catId: String? = nil
     @State private var memberId: String? = nil
     @State private var amount = ""
+    @State private var rollover = false
     @State private var del: BudgetStatus?
 
     init(ctx: GroupCtx, month: Date) {
@@ -205,9 +206,10 @@ struct BudgetView: View {
                         Picker("人", selection: $memberId) { ForEach(ctx.activeMembers) { Text($0.displayName).tag(Optional($0.id)) } }
                     }
                     AmountField(label: "月の上限（円）", text: $amount)
+                    Toggle("余りを翌月に回す（使いすぎた分は翌月から引く）", isOn: $rollover)
                     Button("保存する") {
                         let a = Money.parse(amount) ?? 0
-                        Task { if await loader.act("予算を保存しました", { try await ctx.repo.saveBudget(ctx.g, scope: scope, category: catId, member: scope == "personal" ? memberId : nil, start: month, amount: a) }) { amount = "" } }
+                        Task { if await loader.act("予算を保存しました", { try await ctx.repo.saveBudget(ctx.g, scope: scope, category: catId, member: scope == "personal" ? memberId : nil, start: month, amount: a, rollover: rollover) }) { amount = "" } }
                     }.disabled(Validate.amount(amount) != nil || loader.busy || (scope == "personal" && memberId == nil))
                 } header: { Text("予算を決める（この月から、次に変えるまで続く）") }
             }

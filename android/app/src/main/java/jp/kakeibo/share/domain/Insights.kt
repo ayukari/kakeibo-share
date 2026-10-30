@@ -15,14 +15,14 @@ object Insights {
         val days = LongArray(month.lengthOfMonth())
         for (t in txns) if (isExpense(t) && t.recurringId == null && inMonth(t, month)) {
             val d = t.occurredOn.substring(8, 10).toIntOrNull() ?: continue
-            if (d in 1..days.size) days[d - 1] += t.amount
+            if (d in 1..days.size) days[d - 1] += t.signed
         }
         for (i in 1 until days.size) days[i] += days[i - 1]
         return days
     }
 
     // 固定費（定期的な収支から作られた支出）の合計
-    fun fixedTotal(txns: List<Txn>, month: YearMonth): Long = txns.filter { isExpense(it) && it.recurringId != null && inMonth(it, month) }.sumOf { it.amount }
+    fun fixedTotal(txns: List<Txn>, month: YearMonth): Long = txns.filter { isExpense(it) && it.recurringId != null && inMonth(it, month) }.sumOf { it.signed }
 
     // その月の、今日を含む残りの日数（過去の月は 0、先の月は月の日数）
     fun daysLeft(month: YearMonth, today: LocalDate): Int {
@@ -45,7 +45,7 @@ object Insights {
         val days = LongArray(month.lengthOfMonth())
         for (t in txns) if (isExpense(t) && inMonth(t, month)) {
             val d = t.occurredOn.substring(8, 10).toIntOrNull() ?: continue
-            if (d in 1..days.size) days[d - 1] += t.amount
+            if (d in 1..days.size) days[d - 1] += t.signed
         }
         return days
     }

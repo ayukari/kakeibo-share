@@ -421,7 +421,7 @@ enum Csv {
         for t in list.sorted(by: { $0.occurredOn < $1.occurredOn }) {
             let mode = t.splitMode == "equal" ? "均等" : t.splitMode == "custom" ? "指定" : ""
             let detail = (splits[t.id] ?? []).map { "\(member($0.memberId)):\($0.amount)" }.joined(separator: " ")
-            out += row([t.occurredOn, t.kind == "income" ? "収入" : "支出", String(t.amount), cat(t.categoryId), member(t.payerMemberId), pm(t.paymentMethodId), t.memo,
+            out += row([t.occurredOn, t.kind == "income" ? "収入" : (t.refund ? "返金" : "支出"), String(t.amount), cat(t.categoryId), member(t.payerMemberId), pm(t.paymentMethodId), t.memo,
                         t.visibility == "private" ? "自分だけ" : "グループ", mode, detail, t.id]) + "\r\n"
         }
         return out

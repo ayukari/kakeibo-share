@@ -79,7 +79,7 @@ fun TxnListScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit
                             (q.isBlank() || t.memo.contains(q.trim(), true) || (ctx.cat(t.categoryId)?.name?.contains(q.trim(), true) == true) ||
                                 ctx.memberName(t.payerMemberId).contains(q.trim(), true) || t.amount.toString() == q.trim().replace(",", "").removePrefix("¥"))
                     }.let { l -> when (sort) { "old" -> l.reversed(); "amount" -> l.sortedByDescending { it.amount }; else -> l } }
-                    val inc = list.filter { it.kind == "income" }.sumOf { it.amount }; val exp = list.filter { it.kind == "expense" }.sumOf { it.amount }
+                    val inc = list.filter { it.kind == "income" }.sumOf { it.amount }; val exp = list.filter { it.kind == "expense" }.sumOf { it.signed }
                     SectionLabel("${list.size} 件", "収入 ${Money.format(inc)}・支出 ${Money.format(exp)}")
                     if (list.isEmpty()) Paper { EmptyBox(if (all.isEmpty()) "この月の記録はありません" else "条件に合う記録はありません", if (all.isEmpty()) "月を変えるか、記録を追加してください" else "絞り込みを変えてみてください") }
                     else ListPaper { list.forEachIndexed { i, t -> if (i > 0) DashedLine(); TxnRow(ctx, t) { if (ctx.canEdit(t)) open(Sub.EditTxn(t)) else ctx.app.toast("この記録を直す権限がありません") } } }
@@ -139,7 +139,7 @@ fun CalendarSection(ctx: GroupCtx, month: LocalDate, all: List<Txn>, selDay: Int
     if (sel != null) {
         val key = "%04d-%02d-%02d".format(ym.year, ym.monthValue, sel)
         val ls = all.filter { it.status == "active" && it.occurredOn == key }
-        SectionLabel("${ym.monthValue}/$sel", if (ls.isNotEmpty()) Money.format(ls.filter { it.kind == "expense" }.sumOf { it.amount }) else null)
+        SectionLabel("${ym.monthValue}/$sel", if (ls.isNotEmpty()) Money.format(ls.filter { it.kind == "expense" }.sumOf { it.signed }) else null)
         if (ctx.can("member")) OutlinedButton({ open(Sub.EditTxn(null, "expense", ym.atDay(sel))) }, Modifier.fillMaxWidth().padding(bottom = 8.dp).heightIn(min = 48.dp), shape = ButtonShape) { Text("＋ この日に記録する", color = T.ink, fontWeight = FontWeight.Bold) }
         if (ls.isEmpty()) Paper { Sub("この日の記録はありません") }
         else ListPaper { ls.forEachIndexed { i, t -> if (i > 0) DashedLine(); TxnRow(ctx, t) { if (ctx.canEdit(t)) open(Sub.EditTxn(t)) } } }
@@ -159,6 +159,7 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
     var pm by remember { mutableStateOf(ctx.pms.firstOrNull { it.id == txn?.paymentMethodId }) }
     var memo by remember { mutableStateOf(txn?.memo ?: "") }
     var private by remember { mutableStateOf(txn?.visibility == "private") }
+    var refund by remember { mutableStateOf(txn?.isRefund == true) }
     var split by remember { mutableStateOf(txn?.splitMode ?: "none") }
     val equal = remember { mutableStateListOf<String>() }
     val custom = remember { mutableStateMapOf<String, String>() }
@@ -197,7 +198,8 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
             if (private) "private" else "group", if (kind == "income" || private) "none" else if (split == "ratio") "custom" else split,
             equalMembers = equal.toList(),
             customShares = if (split == "ratio") splitMembers.zip(Calc.ratioSplit(a!!, splitMembers.map { ratio[it.id]?.toIntOrNull() ?: 0 })!!).filter { it.second > 0 }.associate { it.first.id to it.second }
-                else custom.mapNotNull { (k, v) -> Money.parse(v)?.takeIf { it > 0 }?.let { k to it } }.toMap())
+                else custom.mapNotNull { (k, v) -> Money.parse(v)?.takeIf { it > 0 }?.let { k to it } }.toMap(),
+            isRefund = kind == "expense" && refund)
     }
     fun save(t: TxnInput) { busy = true; scope.launch {
         try { ctx.repo.saveTransaction(ctx.g.id, t); onSaved(if (txn == null) "保存しました" else "変更を保存しました") }
@@ -220,7 +222,11 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
         CalcKeypad { key -> amount = Calc.press(amount, key); amountErr = null }
         Label("カテゴリ")
         CategoryGrid(cats, cat) { cat = it }
-        Picker(if (kind == "income") "受け取った人" else "払った人", ctx.members.filter { it.status == "active" || it.id == txn?.payerMemberId }, payer, { it.displayName }, { payer = it })
+        if (kind == "expense") Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(refund, { refund = it }, Modifier.testTag("refund"))
+            Text("返金（払い戻し・返品で戻ってきたお金。支出と立替から引きます）", Modifier.padding(start = 8.dp), color = T.ink, fontSize = 14.sp)
+        }
+        Picker(if (kind == "income" || refund) "受け取った人" else "払った人", ctx.members.filter { it.status == "active" || it.id == txn?.payerMemberId }, payer, { it.displayName }, { payer = it })
         Picker("支払い方法（任意）", listOf<PaymentMethod?>(null) + ctx.pms.filter { it.archivedAt == null || it.id == txn?.paymentMethodId }, pm, { it?.name ?: "なし" }, { pm = it })
         OutlinedTextField(memo, { memo = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("メモ（任意）") })
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -267,7 +273,7 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
         }
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("txnError")) }
         Button(::trySave, Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("save"), enabled = !busy, shape = ButtonShape) {
-            if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text(if (kind == "income") "収入を記録する" else "支出を記録する", fontWeight = FontWeight.Bold)
+            if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text(if (kind == "income") "収入を記録する" else if (refund) "返金を記録する" else "支出を記録する", fontWeight = FontWeight.Bold)
         }
         if (txn != null) OutlinedButton({ askDelete = true }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !busy, shape = ButtonShape) { Text("この記録を消す", color = MaterialTheme.colorScheme.error) }
     }

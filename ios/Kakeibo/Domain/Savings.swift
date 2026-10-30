@@ -56,9 +56,10 @@ enum Savings {
     }
 
     // 予算の余り（カテゴリの予算、なければ全体の予算の残り）。余りがなければ nil
+    // 翌月に繰り越す予算の余りは、貯金に回さない（二重に使わないため）
     static func leftover(_ budgets: [BudgetStatus]) -> Int64? {
-        let cat = budgets.filter { $0.scope == "group" && $0.categoryId != nil }
-        let rows = cat.isEmpty ? budgets.filter { $0.scope == "group" && $0.categoryId == nil } : cat
+        let cat = budgets.filter { $0.scope == "group" && $0.categoryId != nil && !$0.rolls }
+        let rows = cat.isEmpty ? budgets.filter { $0.scope == "group" && $0.categoryId == nil && !$0.rolls } : cat
         if rows.isEmpty { return nil }
         let left = rows.reduce(Int64(0)) { $0 + $1.amount } - rows.reduce(Int64(0)) { $0 + $1.spent }
         return left > 0 ? left : nil

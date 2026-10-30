@@ -59,8 +59,11 @@ struct Txn: Codable, Identifiable, Hashable {
     var createdAt: String? = nil
     var version: Int = 1
     var recurringId: String? = nil
+    var isRefund: Bool? = nil   // 返金（支出だけ。集計と立替では引く）。古いサーバーでは届かない
+    var refund: Bool { isRefund ?? false }
+    var signed: Int64 { refund ? -amount : amount }
     enum CodingKeys: String, CodingKey {
-        case id, kind, amount, memo, visibility, status, version
+        case id, kind, amount, memo, visibility, status, version, isRefund = "is_refund"
         case groupId = "group_id", occurredOn = "occurred_on", categoryId = "category_id", payerMemberId = "payer_member_id"
         case paymentMethodId = "payment_method_id", splitMode = "split_mode", createdBy = "created_by", createdAt = "created_at", recurringId = "recurring_id"
     }
@@ -115,7 +118,12 @@ struct BudgetStatus: Codable, Hashable {
     let remaining: Int64
     let ratio: Double
     let over: Bool
-    enum CodingKeys: String, CodingKey { case scope, amount, spent, remaining, ratio, over, budgetId = "budget_id", categoryId = "category_id", memberId = "member_id" }
+    var carry: Int64? = nil      // 前の月からの繰り越し（余りは +、使いすぎは −）
+    var rollover: Bool? = nil
+    var carried: Int64 { carry ?? 0 }
+    var rolls: Bool { rollover ?? false }
+    var available: Int64 { amount + carried }
+    enum CodingKeys: String, CodingKey { case scope, amount, spent, remaining, ratio, over, carry, rollover, budgetId = "budget_id", categoryId = "category_id", memberId = "member_id" }
 }
 
 struct AmountBy: Codable, Hashable {
@@ -226,6 +234,7 @@ struct TxnInput {
     var splitMode: String
     var equalMembers: [String] = []
     var customShares: [String: Int64] = [:]
+    var isRefund = false
 }
 
 // ---------- 貯金（目標＝封筒・記録＝通帳） ----------

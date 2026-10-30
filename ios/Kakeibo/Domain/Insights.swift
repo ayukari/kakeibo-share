@@ -17,7 +17,7 @@ enum Insights {
     static func variableCumulative(_ txns: [Txn], month: Date) -> [Int64] {
         var days = [Int64](repeating: 0, count: lengthOfMonth(month))
         for t in txns where isExpense(t) && t.recurringId == nil && inMonth(t, month) {
-            if let d = day(t), d >= 1, d <= days.count { days[d - 1] += t.amount }
+            if let d = day(t), d >= 1, d <= days.count { days[d - 1] += t.signed }
         }
         for i in days.indices.dropFirst() { days[i] += days[i - 1] }
         return days
@@ -25,7 +25,7 @@ enum Insights {
 
     // 固定費（定期的な収支から作られた支出）の合計
     static func fixedTotal(_ txns: [Txn], month: Date) -> Int64 {
-        txns.filter { isExpense($0) && $0.recurringId != nil && inMonth($0, month) }.reduce(0) { $0 + $1.amount }
+        txns.filter { isExpense($0) && $0.recurringId != nil && inMonth($0, month) }.reduce(0) { $0 + $1.signed }
     }
 
     // その月の、今日を含む残りの日数（過去の月は 0、先の月は月の日数）
@@ -47,7 +47,7 @@ enum Insights {
     static func dailyExpense(_ txns: [Txn], month: Date) -> [Int64] {
         var days = [Int64](repeating: 0, count: lengthOfMonth(month))
         for t in txns where isExpense(t) && inMonth(t, month) {
-            if let d = day(t), d >= 1, d <= days.count { days[d - 1] += t.amount }
+            if let d = day(t), d >= 1, d <= days.count { days[d - 1] += t.signed }
         }
         return days
     }

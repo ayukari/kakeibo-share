@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -139,7 +140,7 @@ fun ReportScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit)
                     SectionLabel("カテゴリ別の支出")
                     if (d.sum.byCategory.isEmpty()) Paper { Sub("この月の支出はありません") }
                     else Paper(padding = 12.dp) {
-                        val sorted = d.sum.byCategory.sortedByDescending { it.amount }
+                        val sorted = d.sum.byCategory.filter { it.amount > 0 }.sortedByDescending { it.amount }
                         Donut(sorted.map { Slice(ctx.cat(it.categoryId)?.name ?: "不明", ctx.cat(it.categoryId)?.color, it.amount) }, "支出", d.sum.expense)
                         sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount) }
                     }
@@ -181,8 +182,9 @@ fun BudgetRow(ctx: GroupCtx, b: BudgetStatus) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (b.categoryId != null) { CategoryDot(ctx.cat(b.categoryId)?.name, ctx.cat(b.categoryId)?.color, 14.dp); Spacer(Modifier.width(8.dp)) }
             Text(name, Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-            Text("${Money.format(b.spent)} / ${Money.format(b.amount)}", color = T.sub, fontSize = 14.sp)
+            Text("${Money.format(b.spent)} / ${Money.format(b.available)}", color = T.sub, fontSize = 14.sp)
         }
+        if (b.rollover) Faint(if (b.carry == 0L) "毎月 ${Money.format(b.amount)}・余りは翌月に回す" else "毎月 ${Money.format(b.amount)}・先月から ${if (b.carry > 0) "+" else ""}${Money.format(b.carry)}", Modifier.padding(top = 2.dp))
         Meter(b.ratio.toFloat(), if (b.over) T.danger else T.accent, null, Modifier.padding(top = 6.dp))
         Faint(if (b.remaining >= 0) "あと ${Money.format(b.remaining)}" else "${Money.format(-b.remaining)} こえています", Modifier.padding(top = 4.dp))
     }
@@ -201,6 +203,7 @@ fun BudgetScreen(ctx: GroupCtx, month: LocalDate) {
     var cat by remember { mutableStateOf<Category?>(null) }
     var member by remember { mutableStateOf(ctx.me) }
     var amount by remember { mutableStateOf("") }
+    var rollover by remember { mutableStateOf(false) }
     var del by remember { mutableStateOf<BudgetStatus?>(null) }
 
     Box(Modifier.fillMaxSize()) {
@@ -218,8 +221,12 @@ fun BudgetScreen(ctx: GroupCtx, month: LocalDate) {
                 Picker("カテゴリ", listOf<Category?>(null) + ctx.cats.filter { it.kind == "expense" && it.archivedAt == null }, cat, { it?.name ?: "全体（すべての支出）" }, { cat = it })
                 if (scope == "personal") Picker("人", ctx.activeMembers, member, { it.displayName }, { member = it })
                 AmountField(amount, { amount = it }, label = "月の上限（円）")
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
+                    Switch(rollover, { rollover = it }, Modifier.testTag("rollover"))
+                    Text("余りを翌月に回す（使いすぎた分は翌月から引く）", Modifier.padding(start = 8.dp), color = T.ink, fontSize = 14.sp)
+                }
                 val err = Validate.amount(amount)
-                Button({ vm.act("予算を保存しました", onDone = { if (it) amount = "" }) { ctx.repo.saveBudget(ctx.g.id, scope, cat?.id, if (scope == "personal") member?.id else null, month, Money.parse(amount)!!) } },
+                Button({ vm.act("予算を保存しました", onDone = { if (it) amount = "" }) { ctx.repo.saveBudget(ctx.g.id, scope, cat?.id, if (scope == "personal") member?.id else null, month, Money.parse(amount)!!, rollover) } },
                     Modifier.fillMaxWidth().heightIn(min = 52.dp), enabled = err == null && !busy && (scope == "group" || member != null)) { Text("保存する") }
             }
         }

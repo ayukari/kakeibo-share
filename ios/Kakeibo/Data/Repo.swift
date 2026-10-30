@@ -123,7 +123,7 @@ final class Repo: @unchecked Sendable {
         var p: [String: AnyJSON] = [
             "client_request_id": .string(t.clientRequestId), "kind": .string(t.kind), "amount": .integer(Int(t.amount)), "occurred_on": .string(t.occurredOn),
             "category_id": .string(t.categoryId), "payer_member_id": .string(t.payerMemberId), "payment_method_id": s(t.paymentMethodId),
-            "memo": .string(t.memo), "visibility": .string(t.visibility), "split_mode": .string(t.splitMode),
+            "memo": .string(t.memo), "visibility": .string(t.visibility), "split_mode": .string(t.splitMode), "is_refund": .bool(t.isRefund),
         ]
         if let id = t.id { p["id"] = .string(id) }
         if let v = t.version { p["version"] = .integer(v) }
@@ -143,8 +143,8 @@ final class Repo: @unchecked Sendable {
     func monthSummary(_ g: String, _ m: Date) async throws -> MonthSummary { try await rpc("month_summary", ["p_group": .string(g), "p_month": month(m)]) }
     func monthlySeries(_ g: String, end: Date, months: Int = 6) async throws -> [MonthPoint] { try await rpc("monthly_series", ["p_group": .string(g), "p_end_month": month(end), "p_months": .integer(months)]) }
     func budgetStatus(_ g: String, _ m: Date) async throws -> [BudgetStatus] { try await rpc("budget_status", ["p_group": .string(g), "p_month": month(m)]) }
-    func saveBudget(_ g: String, scope: String, category: String?, member: String?, start: Date, amount: Int64) async throws {
-        try await rpcVoid("save_budget", ["p_group": .string(g), "p_scope": .string(scope), "p_category": s(category), "p_member": s(member), "p_start_month": month(start), "p_amount": .integer(Int(amount))])
+    func saveBudget(_ g: String, scope: String, category: String?, member: String?, start: Date, amount: Int64, rollover: Bool = false) async throws {
+        try await rpcVoid("save_budget", ["p_group": .string(g), "p_scope": .string(scope), "p_category": s(category), "p_member": s(member), "p_start_month": month(start), "p_amount": .integer(Int(amount)), "p_rollover": .bool(rollover)])
     }
     func deleteBudget(_ id: String) async throws { try await rpcVoid("delete_budget", ["p_id": .string(id)]) }
 

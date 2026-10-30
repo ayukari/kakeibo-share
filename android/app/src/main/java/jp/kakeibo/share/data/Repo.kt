@@ -134,7 +134,7 @@ class Repo(val client: SupabaseClient) {
             t.id?.let { put("id", it) }; t.version?.let { put("version", it) }
             put("client_request_id", t.clientRequestId); put("kind", t.kind); put("amount", t.amount); put("occurred_on", t.occurredOn)
             put("category_id", t.categoryId); put("payer_member_id", t.payerMemberId); put("payment_method_id", t.paymentMethodId)
-            put("memo", t.memo); put("visibility", t.visibility); put("split_mode", t.splitMode)
+            put("memo", t.memo); put("visibility", t.visibility); put("split_mode", t.splitMode); put("is_refund", t.isRefund)
             put("splits", when (t.splitMode) {
                 "equal" -> buildJsonArray { t.equalMembers.forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } }
                 "custom" -> buildJsonArray { t.customShares.forEach { (m, a) -> add(buildJsonObject { put("member_id", m); put("amount", a) }) } }
@@ -152,8 +152,8 @@ class Repo(val client: SupabaseClient) {
         rpcList("monthly_series", buildJsonObject { put("p_group", g); put("p_end_month", end.withDayOfMonth(1).toString()); put("p_months", months) })
     suspend fun budgetStatus(g: String, month: LocalDate): List<BudgetStatus> = rpcList("budget_status", buildJsonObject { put("p_group", g); put("p_month", month.withDayOfMonth(1).toString()) })
     suspend fun budgets(g: String): List<Budget> = call { client.from("budgets").select { filter { eq("group_id", g) }; order("start_month", Order.DESCENDING) }.decodeList<Budget>() }
-    suspend fun saveBudget(g: String, scope: String, category: String?, member: String?, startMonth: LocalDate, amount: Long): Budget =
-        rpc("save_budget", buildJsonObject { put("p_group", g); put("p_scope", scope); put("p_category", category); put("p_member", member); put("p_start_month", startMonth.withDayOfMonth(1).toString()); put("p_amount", amount) })
+    suspend fun saveBudget(g: String, scope: String, category: String?, member: String?, startMonth: LocalDate, amount: Long, rollover: Boolean = false): Budget =
+        rpc("save_budget", buildJsonObject { put("p_group", g); put("p_scope", scope); put("p_category", category); put("p_member", member); put("p_start_month", startMonth.withDayOfMonth(1).toString()); put("p_amount", amount); put("p_rollover", rollover) })
     suspend fun deleteBudget(id: String) = rpcUnit("delete_budget", buildJsonObject { put("p_id", id) })
 
     // ---------- 精算 ----------

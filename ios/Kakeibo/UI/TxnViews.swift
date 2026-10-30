@@ -51,7 +51,7 @@ struct TxnListView: View {
     @ViewBuilder private func list(_ all: [Txn]) -> some View {
         let l = filtered(all)
         let inc = l.filter { $0.kind == "income" }.reduce(Int64(0)) { $0 + $1.amount }
-        let exp = l.filter { $0.kind == "expense" }.reduce(Int64(0)) { $0 + $1.amount }
+        let exp = l.filter { $0.kind == "expense" }.reduce(Int64(0)) { $0 + $1.signed }
         SectionLabel(text: "\(l.count) 件", trailing: "収入 \(Money.format(inc))・支出 \(Money.format(exp))")
         if l.isEmpty {
             Paper { EmptyBox(title: all.isEmpty ? "この月の記録はありません" : "条件に合う記録はありません", message: all.isEmpty ? "月を変えるか、記録を追加してください" : "絞り込みを変えてみてください") }
@@ -146,7 +146,7 @@ struct CalendarSection: View {
         if let sel {
             let key = String(Money.dateString(first).prefix(7)) + "-" + String(format: "%02d", sel)
             let ls = all.filter { $0.status == "active" && $0.occurredOn == key }
-            let dayTotal = ls.filter { $0.kind == "expense" }.reduce(Int64(0)) { $0 + $1.amount }
+            let dayTotal = ls.filter { $0.kind == "expense" }.reduce(Int64(0)) { $0 + $1.signed }
             SectionLabel(text: "\(m)/\(sel)", trailing: ls.isEmpty ? nil : Money.format(dayTotal))
             if ctx.can("member") {
                 NavigationLink { TxnEditView(ctx: ctx, txn: nil, initialDate: Money.calendar.date(byAdding: .day, value: sel - 1, to: first)) } label: {
@@ -175,6 +175,7 @@ struct TxnEditView: View {
     @State private var pmId: String? = nil
     @State private var memo = ""
     @State private var isPrivate = false
+    @State private var isRefund = false
     @State private var split = "none"
     @State private var equal: Set<String> = []
     @State private var custom: [String: String] = [:]
@@ -205,7 +206,8 @@ struct TxnEditView: View {
                     .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
             }
             Section {
-                Picker(kind == "income" ? "受け取った人" : "払った人", selection: $payerId) {
+                if kind == "expense" { Toggle("返金（払い戻し・返品で戻ってきたお金。支出と立替から引きます）", isOn: $isRefund) }
+                Picker(kind == "income" || isRefund ? "受け取った人" : "払った人", selection: $payerId) {
                     ForEach(ctx.members.filter { $0.status == "active" || $0.id == txn?.payerMemberId }) { Text($0.displayName).tag(Optional($0.id)) }
                 }
                 Picker("支払い方法（任意）", selection: $pmId) {
@@ -252,7 +254,7 @@ struct TxnEditView: View {
             }
             if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("txnError") }
             Section {
-                Button { trySave() } label: { HStack { Spacer(); if busy { ProgressView() } else { Text(kind == "income" ? "収入を記録する" : "支出を記録する").bold() }; Spacer() }.frame(minHeight: 44) }
+                Button { trySave() } label: { HStack { Spacer(); if busy { ProgressView() } else { Text(kind == "income" ? "収入を記録する" : (isRefund ? "返金を記録する" : "支出を記録する")).bold() }; Spacer() }.frame(minHeight: 44) }
                     .disabled(busy).accessibilityIdentifier("save")
                 if txn != nil { Button("この記録を消す", role: .destructive) { askDelete = true }.disabled(busy) }
             }
@@ -278,7 +280,7 @@ struct TxnEditView: View {
         for (i, m) in act.enumerated() { ratio[m.id] = String(100 / max(1, act.count) + (i < 100 % max(1, act.count) ? 1 : 0)) }
         guard let t = txn else { payerId = ctx.me?.id; equal = Set(act.map(\.id)); if let d = initialDate { date = d }; return }
         kind = t.kind; amount = String(t.amount); date = Money.date(t.occurredOn) ?? date; catId = t.categoryId; payerId = t.payerMemberId
-        pmId = t.paymentMethodId; memo = t.memo; isPrivate = t.visibility == "private"; split = t.splitMode
+        pmId = t.paymentMethodId; memo = t.memo; isPrivate = t.visibility == "private"; isRefund = t.refund; split = t.splitMode
         if t.splitMode != "none" {
             splitsLoaded = false
             do {
@@ -302,7 +304,8 @@ struct TxnEditView: View {
                         categoryId: catId!, payerMemberId: payerId!, paymentMethodId: pmId, memo: memo.trimmingCharacters(in: .whitespacesAndNewlines),
                         visibility: isPrivate ? "private" : "group", splitMode: mode,
                         equalMembers: splitMembers.map(\.id).filter { equal.contains($0) },
-                        customShares: split == "ratio" ? ratioShares : custom.compactMapValues { Money.parse($0) }.filter { $0.value > 0 })
+                        customShares: split == "ratio" ? ratioShares : custom.compactMapValues { Money.parse($0) }.filter { $0.value > 0 },
+                        isRefund: kind == "expense" && isRefund)
     }
 
     // 入力の誤りを上から順に調べ、最初の 1 つを返す（金額の誤りは入力欄の下に出す）

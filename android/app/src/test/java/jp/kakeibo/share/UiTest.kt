@@ -86,6 +86,15 @@ class UiTest {
         rule.onAllNodesWithText("¥750", useUnmergedTree = true).assertCountEquals(2)
     }
 
+    @Test fun refundToggleChangesLabels() {
+        val c = ctx("member")
+        rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
+        rule.onNodeWithText("支出を記録する").performScrollTo().assertExists()
+        rule.onNodeWithTag("refund").performScrollTo().performClick()
+        rule.onNodeWithText("返金を記録する").performScrollTo().assertExists()
+        rule.onNodeWithText("受け取った人").assertExists()
+    }
+
     @Test fun categoryTilesSelect() {
         val c = ctx("member")
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
