@@ -155,3 +155,37 @@ Google Play で「家計簿」を検索した上位から、ダウンロード�
 
 - 貯金箱の中身を、Blender で作った 3D の画像に変えた（`tools/render3d/money_sprites.py` で描き出し。Android は `res/drawable-nodpi/money_t{段階}_f{コマ}.png`、iOS は `Resources/Money`）。段階ごとに 8 コマで、0 コマ目が置いた姿、1〜7 コマ目は 45° ずつ回した姿。
 - 降ってくるとき、1 枚ずつ 1 回転半しながら落ち、着いたときに置いた姿になる。札束の表と裏は札の色、あいだは紙の縁の色。
+
+# 先人調査 6: 物理エンジン（2026-10-30）
+
+貯金箱の硬貨・札束を、本物の物理（重力・ぶつかり・積み重なり）で落とすための候補。★と最終更新は GitHub（2026-10-30 時点）。
+
+## 2D（箱を正面から見た今の絵にそのまま合う）
+
+| エンジン | ライセンス | ★ / 更新 | Android | iOS | 向き不向き |
+|---|---|---|---|---|---|
+| [Box2D v3.2](https://github.com/erincatto/box2d)（C17） | MIT | 10.5k / 2026-10 | [box2d-jni](https://github.com/fabmax/box2d-jni)（MIT、Maven Central に Android 用 AAR。v3.2.0 の全 API）か、NDK で自分でビルド | C のソースを Xcode に入れて Swift から直接呼ぶ | 「たくさんの物の山」向けに最適化、端末をまたいで同じ結果（決定論的）、眠り（止まった物の計算を省く）。両 OS で同じ動きにできる |
+| [boks2d](https://github.com/joaomcl/boks2d) | MIT | 33 / 2026-03 | Kotlin Multiplatform | Kotlin/Native | Box2D を両 OS で 1 つのコードから。まだ 0.1 で若い |
+| SpriteKit の物理（Apple 標準） | — | — | — | `SpriteView` で SwiftUI に埋め込める | 追加の部品なし。数百個の硬貨でも十分。iOS 26 で SwiftUI を重ねたときに遅くなる報告あり（[Apple のフォーラム](https://developer.apple.com/forums/thread/804973)） |
+| UIKit Dynamics（Apple 標準） | — | — | — | `UIDynamicAnimator` | 重力とぶつかりだけの簡単なもの。積み重なりは苦手 |
+| [dyn4j](https://github.com/dyn4j/dyn4j)（Java だけ） | BSD-3 | 541 / 2026-07 | ネイティブのライブラリが要らない | — | Compose 用のラッパー [ComposePhysicsLayout](https://github.com/KlassenKonstantin/ComposePhysicsLayout)（Apache-2.0、2023 年で止まっている・試作扱い） |
+| [JBox2D](https://github.com/jbox2d/jbox2d)（Box2D の古い Java 版） | BSD-2 | 1.2k / 2024-09 | [PhysicsLayout](https://github.com/Jawnnypoo/PhysicsLayout)（View 用） | — | 元の Box2D v2 系。新しい v3 の改良（山の安定）がない |
+| [Rapier](https://github.com/dimforge/rapier)（Rust） | Apache-2.0 | 6.0k / 2026-10 | Rust を NDK でビルド | Rust を iOS 用にビルド | 2D・3D とも。両 OS のビルドの手間が大きい |
+| [matter.js](https://github.com/liabru/matter-js) | MIT | 18.6k | — | — | Web 用。アプリには向かない |
+
+## 3D（アプリの中で 3D のまま動かす場合）
+
+| エンジン | ライセンス | ★ | メモ |
+|---|---|---|---|
+| [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | MIT | 11.9k | 最近のゲームで使われる 3D の物理。描画は別に要る（Android は [Filament](https://github.com/google/filament)・[SceneView](https://github.com/SceneView/sceneview-android)） |
+| [Bullet](https://github.com/bulletphysics/bullet3) | zlib | 14.8k | 古くからの定番 |
+| [PhysX](https://github.com/NVIDIA-Omniverse/PhysX) | BSD-3 | 4.8k | NVIDIA。重い |
+| SceneKit・RealityKit の物理（Apple 標準） | — | — | iOS だけ |
+
+3D のまま動かすと、描画と物理の両方を両 OS で別々に組むことになり、アプリも重くなる。
+
+## おすすめ
+
+1. **Box2D v3.2 を両 OS で使う**: Android は box2d-jni（AAR）、iOS は C のソースをそのまま入れる。同じエンジン・同じ設定なので、両 OS で同じ積もり方になる。硬貨は角の丸い横長の箱（置いた硬貨の形）、札束は箱として落とし、描くのは今の 3D の画像（体の傾きに合わせて回す。回っている速さに合わせてコマを進める）。
+2. 手間を減らすなら: Android は dyn4j、iOS は SpriteKit。ただし両 OS で動きが少しずつ違う。
+- どちらでも: 落とす枚数は目標に対する割合で決める（100% で箱がいっぱい）。止まったら計算を止める（電池を使わない）。「動きを減らす」設定のときは、計算を一気に進めて積もった形だけ出す。端末を傾けると中身が転がる、貯金を記録したときに 1 枚ずつ足す、なども物理なら自然にできる。
