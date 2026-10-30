@@ -126,3 +126,27 @@ Google Play で「家計簿」を検索した上位から、ダウンロード�
 | [LottieFiles](https://help.lottiefiles.com/hc/en-us/articles/900002438343-Can-I-use-a-free-animation-on-Lottiefiles-for-commercial-business-use) | 無料の動きは Lottie Simple License（商用可）。作品ごとに条件の確認が必要 | 硬貨が落ちる動きなど | 作品による |
 
 - 本物の硬貨・お札の写真や、それに近い絵は避ける（[財務省 FAQ](https://www.mof.go.jp/faq/currency/07af.htm)）。いらすとやの硬貨・お札は、デフォルメした絵。
+
+# 先人調査 5: 3DCG の硬貨・札束（2026-10-30）
+
+## 無料の 3D モデル
+
+| 置き場所 | モデル | ライセンス | 見た目 | 使えるか |
+|---|---|---|---|---|
+| [Sketchfab](https://sketchfab.com/models/7605cd1ccf42498f8cd02b3f758c1643) | 100 Yen Coin（AlsGraphics、320 面） | CC-BY（表記が必要） | 昔の 100 円玉をそのまま写した見た目 | 避ける（本物に近い） |
+| [Sketchfab](https://sketchfab.com/models/1998b42922be4cbbb752de8b307bdaf4) | Money Stacks（3D_Crackhouse、♥365） | CC-BY | ドル札の束。本物の札の絵柄 | 避ける（本物の札の絵・ドル） |
+| [Sketchfab](https://sketchfab.com/models/632cf7dbc59a496283d1a6092dc6f9b0) | Low Poly Stack of Money（40 面） | CC-BY | ドル札の束 | 同上（形だけなら使えるが、自作と変わらない） |
+| [Sketchfab](https://sketchfab.com/models/5e661adf11f24a76bb9538b536002bb3) | Pile of coins（gnarlypotato、♥254） | CC-BY | 金貨の山 | 表記を入れれば可。日本の硬貨らしさはない |
+| [Poly Pizza / Quaternius](https://poly.pizza/m/9OWkKczINo) | Coin Piles・Coins・Coin Bag | CC0 | ローポリの金貨 | 可。日本の硬貨らしさはない |
+| [Poly Haven](https://polyhaven.com/models) | （硬貨・お札はなし。Cash Register だけ） | CC0 | — | — |
+
+- 札束のモデルは、ほぼ全部がドル札の写真を貼ったもの。日本の札束で、本物に似ていない無料モデルは見つからなかった。
+
+## 結論: Blender で自作して、画像に描き出す
+
+- 手元の Blender 5.2 で、硬貨と札束を一から作るスクリプトを書いた（`tools/render3d/coins3d.py`）。図柄は描かず、色・金属の質感・形だけ。自作なのでライセンスの心配がなく、公開リポジトリに置ける。
+  - 10円 = 青銅、100円 = 白銅、500円 = 外側が金色・内側が銀色。縁の盛り上がりと面取りで立体感を出す。
+  - 千円札・万札 = 10 枚を少しずつずらして重ね、白い帯と透かしの楕円。
+- 動かし方の候補:
+  1. 描き出した画像を、今の「降ってくる」動きにそのまま使う（軽い。Android と iOS で同じ見た目）。回転のコマ（数枚）も描き出せば、くるくる回りながら落ちる。
+  2. アプリの中で 3D を動かす: Android は [SceneView](https://github.com/SceneView/sceneview-android)（Apache-2.0、★1.4k。Google の [Filament](https://github.com/google/filament) の上）、iOS は標準の SceneKit・RealityKit（物理演算あり）。本物の物理で落とせるが、アプリが重くなり、Android と iOS で作りが別々になる。
