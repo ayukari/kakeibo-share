@@ -160,4 +160,26 @@ final class DomainTests: XCTestCase {
         XCTAssertNil(Savings.leftover([b("c1", 10000, 12000)]))
         XCTAssertNil(Savings.leftover([]))
     }
+
+    func testCalculatorKeypad() {
+        XCTAssertEqual(Calc.evaluate("1200+380"), 1580)
+        XCTAssertEqual(Calc.evaluate("1000+500÷2"), 1250)
+        XCTAssertEqual(Calc.evaluate("1000÷3"), 333)
+        XCTAssertEqual(Calc.evaluate("1200+"), 1200)
+        XCTAssertNil(Calc.evaluate("5÷0")); XCTAssertNil(Calc.evaluate("")); XCTAssertNil(Calc.evaluate("−5"))
+        var e = ""; for k in ["1", "2", "+", "×", "3", "="] { e = Calc.press(e, k) }
+        XCTAssertEqual(e, "36")
+        XCTAssertEqual(Calc.press("12", "C"), ""); XCTAssertEqual(Calc.press("12", "⌫"), "1"); XCTAssertEqual(Calc.press("", "00"), ""); XCTAssertEqual(Calc.press("0", "7"), "7")
+        XCTAssertTrue(Calc.hasOperator("1+2")); XCTAssertFalse(Calc.hasOperator("12"))
+    }
+
+    func testRatioSplit() {
+        XCTAssertEqual(Calc.ratioSplit(1000, [60, 40]), [600, 400])
+        XCTAssertEqual(Calc.ratioSplit(1000, [34, 33, 33]), [340, 330, 330])
+        XCTAssertEqual(Calc.ratioSplit(100, [34, 33, 33]), [34, 33, 33])
+        XCTAssertEqual(Calc.ratioSplit(5, [34, 33, 33]), [2, 2, 1])
+        XCTAssertEqual(Calc.ratioSplit(7, [50, 50]), [4, 3])
+        XCTAssertEqual(Calc.ratioSplit(1000, [0, 100]), [0, 1000])
+        XCTAssertNil(Calc.ratioSplit(1000, [60, 30]))
+    }
 }

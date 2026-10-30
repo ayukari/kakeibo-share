@@ -73,7 +73,7 @@ struct RootView: View {
 
     var body: some View {
         if let app {
-            SessionGate(app: app)
+            LockGate { SessionGate(app: app) }
         } else {
             VStack(spacing: 12) {
                 Text("接続先が設定されていません").font(.title2.bold())

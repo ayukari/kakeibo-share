@@ -59,6 +59,7 @@ dependencies {
     implementation(libs.ktor.okhttp)
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
+    implementation(libs.biometric)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

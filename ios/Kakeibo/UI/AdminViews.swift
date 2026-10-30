@@ -319,6 +319,7 @@ struct AccountView: View {
                 TextField("新しいメールアドレス", text: $email).keyboardType(.emailAddress).textInputAutocapitalization(.never)
                 Button("変える") { if let e = Validate.email(email) { message = e } else { run("確認のメールを送りました。新しいアドレスで確認すると変わります") { try await ctx.repo.changeEmail(email) } } }.disabled(busy)
             }
+            Section("ロック") { LockToggle(message: $message) }
             Section("ログアウト・退出・削除") {
                 Button("ログアウト") { Task { await ctx.app.signOut() } }
                 if ctx.me?.role != "owner" {

@@ -140,6 +140,7 @@ fun ReportScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit)
                     if (d.sum.byCategory.isEmpty()) Paper { Sub("この月の支出はありません") }
                     else Paper(padding = 12.dp) {
                         val sorted = d.sum.byCategory.sortedByDescending { it.amount }
+                        Donut(sorted.map { Slice(ctx.cat(it.categoryId)?.name ?: "不明", ctx.cat(it.categoryId)?.color, it.amount) }, "支出", d.sum.expense)
                         sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount) }
                     }
                     if (d.sum.byPayer.isNotEmpty()) {

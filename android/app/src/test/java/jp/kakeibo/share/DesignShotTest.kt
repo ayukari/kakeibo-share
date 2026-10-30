@@ -106,4 +106,13 @@ class DesignShotTest {
         val d = SavingsData(listOf(g1, g2), st, pb, ser, 280000, listOf(120000, 98000, 110000))
         shot("savings") { SavingsContent(c, d, today, {}, {}, null, {}, 20) {} }
     }
+
+    @Test fun entry() {
+        val c = ctx()
+        shot("entry") { Box(Modifier.height(1500.dp)) { TxnEditScreen(c, null, "expense") {} } }
+    }
+
+    @Test fun donut() {
+        shot("donut") { Paper { Donut(listOf(Slice("家賃", "#7a5cc7", 80000), Slice("食費", "#e07a3f", 19500), Slice("日用品", "#3f8fd0", 4400), Slice("交通費", "#5c7ac7", 2300)), "支出", 106200) } }
+    }
 }

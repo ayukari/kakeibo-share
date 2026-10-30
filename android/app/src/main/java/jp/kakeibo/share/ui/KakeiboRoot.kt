@@ -80,11 +80,11 @@ fun KakeiboRoot(repo: Repo?) = KakeiboTheme {
         val ctx = LocalContext.current.applicationContext
         val app: AppVM = viewModel { AppVM(repo, ctx) }
         val status by app.session.collectAsState()
-        when (status) {
+        LockGate { when (status) {
             is SessionStatus.Initializing -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
             is SessionStatus.Authenticated -> GroupGate(app)
             else -> AuthScreen(repo, refreshFailed = status is SessionStatus.RefreshFailure)
-        }
+        } }
     }
 }
 

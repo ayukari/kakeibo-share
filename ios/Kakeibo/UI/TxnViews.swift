@@ -140,6 +140,12 @@ struct CalendarSection: View {
             let ls = all.filter { $0.status == "active" && $0.occurredOn == key }
             let dayTotal = ls.filter { $0.kind == "expense" }.reduce(Int64(0)) { $0 + $1.amount }
             SectionLabel(text: "\(m)/\(sel)", trailing: ls.isEmpty ? nil : Money.format(dayTotal))
+            if ctx.can("member") {
+                NavigationLink { TxnEditView(ctx: ctx, txn: nil, initialDate: Money.calendar.date(byAdding: .day, value: sel - 1, to: first)) } label: {
+                    Text("＋ この日に記録する").font(.system(size: 16, weight: .bold)).foregroundStyle(Color.kInk).frame(maxWidth: .infinity, minHeight: 48)
+                        .background(Color.kCard, in: buttonShape).overlay(buttonShape.stroke(Color.kLine, lineWidth: 1))
+                }.buttonStyle(.plain).padding(.bottom, 8)
+            }
             if ls.isEmpty { Paper { SubText("この日の記録はありません") } }
             else { ListPaper { ForEach(Array(ls.enumerated()), id: \.element.id) { i, t in if i > 0 { DashedLine() }; TxnLink(ctx: ctx, t: t) } } }
         }
@@ -150,6 +156,7 @@ struct CalendarSection: View {
 struct TxnEditView: View {
     let ctx: GroupCtx
     let txn: Txn?
+    var initialDate: Date? = nil
     @Environment(\.dismiss) private var dismiss
     @State private var requestId = UUID().uuidString.lowercased()   // 同じ入力の再送を二重登録にしない
     @State private var kind = "expense"
@@ -163,6 +170,7 @@ struct TxnEditView: View {
     @State private var split = "none"
     @State private var equal: Set<String> = []
     @State private var custom: [String: String] = [:]
+    @State private var ratio: [String: String] = [:]   // 割合（%）で分けるとき
     @State private var splitsLoaded = true
     @State private var error: String?
     @State private var amountError: String?
@@ -175,15 +183,20 @@ struct TxnEditView: View {
 
     var body: some View {
         Form {
-            Picker("種類", selection: $kind) { Text("支出").tag("expense"); Text("収入").tag("income") }.pickerStyle(.segmented)
-                .onChange(of: kind) { if ctx.cat(catId)?.kind != kind { catId = nil } }
             Section {
-                AmountField(label: "金額（円）", text: $amount, error: amountError).accessibilityIdentifier("amount")
-                DatePicker("日付", selection: $date, displayedComponents: .date).environment(\.timeZone, Money.tokyo)
-                Picker("カテゴリ", selection: $catId) {
-                    Text("選んでください").tag(String?.none)
-                    ForEach(ctx.cats.filter { $0.kind == kind && ($0.archivedAt == nil || $0.id == txn?.categoryId) }) { Text("\($0.icon) \($0.name)").tag(Optional($0.id)) }
-                }.accessibilityIdentifier("category")
+                VStack(spacing: 10) {
+                    Segmented(options: ["支出", "収入"], selected: Binding(get: { kind == "expense" ? 0 : 1 }, set: { kind = $0 == 0 ? "expense" : "income" }))
+                    DateStepper(date: $date)
+                    AmountDisplay(expr: amount, error: amountError)
+                    CalcKeypad { k in amount = Calc.press(amount, k); amountError = nil }
+                }.listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+                    .onChange(of: kind) { if ctx.cat(catId)?.kind != kind { catId = nil } }
+            }
+            Section("カテゴリ") {
+                CategoryGrid(cats: ctx.cats.filter { $0.kind == kind && ($0.archivedAt == nil || $0.id == txn?.categoryId) }, selected: $catId)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+            }
+            Section {
                 Picker(kind == "income" ? "受け取った人" : "払った人", selection: $payerId) {
                     ForEach(ctx.members.filter { $0.status == "active" || $0.id == txn?.payerMemberId }) { Text($0.displayName).tag(Optional($0.id)) }
                 }
@@ -196,8 +209,8 @@ struct TxnEditView: View {
             }
             if kind == "expense" && !isPrivate {
                 Section("割り勘") {
-                    Picker("割り勘", selection: $split) { Text("しない").tag("none"); Text("均等").tag("equal"); Text("金額を指定").tag("custom") }.pickerStyle(.segmented)
-                    let a = Money.parse(amount) ?? 0
+                    Picker("割り勘", selection: $split) { Text("しない").tag("none"); Text("均等").tag("equal"); Text("割合").tag("ratio"); Text("金額").tag("custom") }.pickerStyle(.segmented)
+                    let a = Calc.evaluate(amount) ?? 0
                     if split == "equal" {
                         let chosen = splitMembers.filter { equal.contains($0.id) }
                         let shares = Money.equalSplit(a, Swift.max(chosen.count, 1))
@@ -207,6 +220,19 @@ struct TxnEditView: View {
                             }
                         }
                         Text("割り切れない 1 円は、参加の早い人から順に負担します（サーバーで計算）").font(.caption)
+                    } else if split == "ratio" {
+                        let shares = Calc.ratioSplit(a, splitMembers.map { Int(ratio[$0.id] ?? "") ?? 0 })
+                        ForEach(Array(splitMembers.enumerated()), id: \.element.id) { i, m in
+                            HStack {
+                                Text(m.displayName)
+                                Spacer()
+                                TextField("0", text: Binding(get: { ratio[m.id] ?? "" }, set: { ratio[m.id] = String($0.filter(\.isNumber).prefix(3)) })).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 56)
+                                Text("%")
+                                Text(shares != nil && a > 0 ? Money.format(shares![i]) : "").monospacedDigit().frame(width: 88, alignment: .trailing)
+                            }
+                        }
+                        let total = splitMembers.reduce(0) { $0 + (Int(ratio[$1.id] ?? "") ?? 0) }
+                        Text(total == 100 ? "合計 100%（6:4 なども自由に）" : "合計 \(total)%（100% にしてください）").foregroundStyle(total == 100 ? Color.income : Color.over)
                     } else if split == "custom" {
                         ForEach(splitMembers) { m in
                             AmountField(label: "\(m.displayName)の負担", text: Binding(get: { custom[m.id] ?? "" }, set: { custom[m.id] = $0 }))
@@ -218,7 +244,7 @@ struct TxnEditView: View {
             }
             if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("txnError") }
             Section {
-                Button { trySave() } label: { HStack { Spacer(); if busy { ProgressView() } else { Text("保存する").bold() }; Spacer() }.frame(minHeight: 44) }
+                Button { trySave() } label: { HStack { Spacer(); if busy { ProgressView() } else { Text(kind == "income" ? "収入を記録する" : "支出を記録する").bold() }; Spacer() }.frame(minHeight: 44) }
                     .disabled(busy).accessibilityIdentifier("save")
                 if txn != nil { Button("この記録を消す", role: .destructive) { askDelete = true }.disabled(busy) }
             }
@@ -240,7 +266,9 @@ struct TxnEditView: View {
     private func start() async {
         guard !started else { return }
         started = true
-        guard let t = txn else { payerId = ctx.me?.id; equal = Set(ctx.activeMembers.map(\.id)); return }
+        let act = ctx.activeMembers
+        for (i, m) in act.enumerated() { ratio[m.id] = String(100 / max(1, act.count) + (i < 100 % max(1, act.count) ? 1 : 0)) }
+        guard let t = txn else { payerId = ctx.me?.id; equal = Set(act.map(\.id)); if let d = initialDate { date = d }; return }
         kind = t.kind; amount = String(t.amount); date = Money.date(t.occurredOn) ?? date; catId = t.categoryId; payerId = t.payerMemberId
         pmId = t.paymentMethodId; memo = t.memo; isPrivate = t.visibility == "private"; split = t.splitMode
         if t.splitMode != "none" {
@@ -254,17 +282,19 @@ struct TxnEditView: View {
     }
 
     private func input() -> TxnInput? {
-        amountError = Validate.amount(amount); error = nil
-        let a = Money.parse(amount) ?? 0
+        let v = Calc.evaluate(amount)
+        amountError = v == nil ? "金額は 1 円以上の整数で入れてください" : Validate.amount(String(v!)); error = nil
+        let a = v ?? 0
         let shares = splitMembers.compactMap { custom[$0.id].flatMap(Money.parse) }
         let problem = firstProblem(a: a, shares: shares)
         if let problem { if problem != amountError { error = problem }; return nil }   // 金額の誤りは入力欄の下に出す
-        let mode = (kind == "income" || isPrivate) ? "none" : split
+        let mode = (kind == "income" || isPrivate) ? "none" : (split == "ratio" ? "custom" : split)
+        let ratioShares: [String: Int64] = split == "ratio" ? Dictionary(uniqueKeysWithValues: zip(splitMembers.map(\.id), Calc.ratioSplit(a, splitMembers.map { Int(ratio[$0.id] ?? "") ?? 0 }) ?? []).filter { $0.1 > 0 }) : [:]
         return TxnInput(id: txn?.id, version: txn?.version, clientRequestId: requestId, kind: kind, amount: a, occurredOn: Money.dateString(date),
                         categoryId: catId!, payerMemberId: payerId!, paymentMethodId: pmId, memo: memo.trimmingCharacters(in: .whitespacesAndNewlines),
                         visibility: isPrivate ? "private" : "group", splitMode: mode,
                         equalMembers: splitMembers.map(\.id).filter { equal.contains($0) },
-                        customShares: custom.compactMapValues { Money.parse($0) }.filter { $0.value > 0 })
+                        customShares: split == "ratio" ? ratioShares : custom.compactMapValues { Money.parse($0) }.filter { $0.value > 0 })
     }
 
     // 入力の誤りを上から順に調べ、最初の 1 つを返す（金額の誤りは入力欄の下に出す）
@@ -276,6 +306,7 @@ struct TxnEditView: View {
         if let e = Validate.memo(memo) { return e }
         if split == "equal" && equal.isEmpty { return "割り勘する人を選んでください" }
         if split == "custom", let e = Validate.customSplit(a, shares) { return e }
+        if split == "ratio" && Calc.ratioSplit(a, splitMembers.map { Int(ratio[$0.id] ?? "") ?? 0 }) == nil { return "割合の合計を 100% にしてください" }
         if !splitsLoaded { return "割り勘の内訳を読み込めていません" }
         return nil
     }

@@ -6,6 +6,7 @@ import jp.kakeibo.share.domain.AppError
 import jp.kakeibo.share.domain.ErrorKind
 import jp.kakeibo.share.domain.Money
 import jp.kakeibo.share.domain.Validate
+import jp.kakeibo.share.domain.Calc
 import jp.kakeibo.share.domain.Insights
 import jp.kakeibo.share.domain.Savings
 import jp.kakeibo.share.data.*
@@ -154,5 +155,27 @@ class DomainTest {
         assertEquals(6000L, Savings.leftover(listOf(b("c1", 40000, 36000), b("c2", 5000, 3000), b(null, 99999, 0))))
         assertNull(Savings.leftover(listOf(b("c1", 10000, 12000))))
         assertNull(Savings.leftover(emptyList()))
+    }
+
+    @Test fun calculatorKeypad() {
+        assertEquals(1580L, Calc.evaluate("1200+380"))
+        assertEquals(1250L, Calc.evaluate("1000+500÷2"))
+        assertEquals(333L, Calc.evaluate("1000÷3"))
+        assertEquals(1200L, Calc.evaluate("1200+"))
+        assertNull(Calc.evaluate("5÷0")); assertNull(Calc.evaluate("")); assertNull(Calc.evaluate("−5"))
+        var e = ""; listOf("1", "2", "+", "×", "3", "=").forEach { e = Calc.press(e, it) }
+        assertEquals("36", e)
+        assertEquals("", Calc.press("12", "C")); assertEquals("1", Calc.press("12", "⌫")); assertEquals("", Calc.press("", "00")); assertEquals("7", Calc.press("0", "7"))
+        assertTrue(Calc.hasOperator("1+2")); assertFalse(Calc.hasOperator("12"))
+    }
+
+    @Test fun ratioSplit() {
+        assertEquals(listOf(600L, 400L), Calc.ratioSplit(1000, listOf(60, 40)))
+        assertEquals(listOf(340L, 330L, 330L), Calc.ratioSplit(1000, listOf(34, 33, 33)))
+        assertEquals(listOf(34L, 33L, 33L), Calc.ratioSplit(100, listOf(34, 33, 33)))
+        assertEquals(listOf(2L, 2L, 1L), Calc.ratioSplit(5, listOf(34, 33, 33)))
+        assertEquals(listOf(4L, 3L), Calc.ratioSplit(7, listOf(50, 50)))
+        assertEquals(listOf(0L, 1000L), Calc.ratioSplit(1000, listOf(0, 100)))
+        assertNull(Calc.ratioSplit(1000, listOf(60, 30)))
     }
 }

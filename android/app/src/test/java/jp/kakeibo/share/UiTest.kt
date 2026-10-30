@@ -62,7 +62,7 @@ class UiTest {
     @Test fun transactionFormRequiresCategory() {
         val c = ctx("member")
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
-        rule.onNodeWithTag("amount").performTextInput("1200")
+        listOf("1", "2", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
         rule.onNodeWithTag("save").performScrollTo().performClick()
         rule.onNodeWithTag("txnError").assertTextEquals("カテゴリを選んでください")
     }
@@ -70,10 +70,29 @@ class UiTest {
     @Test fun customSplitShowsRemaining() {
         val c = ctx("member")
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
-        rule.onNodeWithTag("amount").performTextInput("1000")
-        rule.onNodeWithText("金額を指定").performScrollTo().performClick()
+        listOf("1", "000").forEach { k -> if (k == "000") { rule.onNodeWithTag("key_00").performScrollTo().performClick(); rule.onNodeWithTag("key_0").performScrollTo().performClick() } else rule.onNodeWithTag("key_$k").performScrollTo().performClick() }
+        rule.onNodeWithText("金額").performScrollTo().performClick()
         rule.onNodeWithText("あきの負担").performScrollTo().performTextInput("600")
         rule.onNodeWithText("合計 ¥600（あと ¥400）").assertExists()
+    }
+
+    @Test fun keypadCalculatesAndRatioSplits() {
+        val c = ctx("member")
+        rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
+        listOf("1", "00", "0", "+", "5", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
+        rule.onNodeWithText("= ¥1,500").assertExists()
+        rule.onNodeWithText("割合").performScrollTo().performClick()
+        rule.onNodeWithText("合計 100%（6:4 なども自由に）").performScrollTo().assertExists()
+        rule.onAllNodesWithText("¥750", useUnmergedTree = true).assertCountEquals(2)
+    }
+
+    @Test fun categoryTilesSelect() {
+        val c = ctx("member")
+        rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
+        rule.onNodeWithTag("cat_食費").performScrollTo().performClick()
+        listOf("8", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
+        rule.onNodeWithTag("save").performScrollTo().performClick()
+        rule.onNodeWithTag("txnError").assertDoesNotExist()
     }
 
     @Test fun viewerSeesNoAuditMenu() {

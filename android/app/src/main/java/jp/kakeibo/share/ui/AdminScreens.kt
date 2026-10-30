@@ -316,6 +316,16 @@ fun AccountScreen(ctx: GroupCtx, onLeft: () -> Unit) {
         SectionTitle("メールアドレス")
         OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), label = { Text("新しいメールアドレス") }, singleLine = true)
         Button({ Validate.email(email)?.let { msg = it } ?: run("確認のメールを送りました。新しいアドレスで確認すると変わります") { ctx.repo.changeEmail(email) } }, enabled = !busy) { Text("変える") }
+        SectionTitle("ロック")
+        val context = LocalContext.current
+        var lockOn by remember { mutableStateOf(AppLock.enabled(context)) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Switch(lockOn, { on ->
+                if (on && !AppLock.available(context)) { msg = "端末に画面ロック（指紋・顔・暗証番号）を設定してから、もう一度ためしてください"; return@Switch }
+                AppLock.setEnabled(context, on); lockOn = on; msg = if (on) "ロックを有効にしました。次に開いたときから使えます" else "ロックを切りました"
+            })
+            Column(Modifier.padding(start = 8.dp)) { Text("アプリにロックをかける", color = T.ink); Faint("開くとき・1 分以上はなれたあとに、指紋・顔・暗証番号で解除します") }
+        }
         SectionTitle("ログアウト・退出・削除")
         OutlinedButton({ ctx.app.signOut() }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("ログアウト") }
         if (ctx.me?.role != "owner") OutlinedButton({ confirm = Triple("この家計簿から抜けますか", "抜けても過去の記録と精算の差額は残ります。", { ctx.repo.leaveGroup(ctx.g.id); onLeft() }) }, Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("この家計簿から抜ける", color = OverColor) }

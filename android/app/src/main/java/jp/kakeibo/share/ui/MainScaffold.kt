@@ -46,7 +46,7 @@ class GroupCtx(val app: AppVM, val g: Group, val me: Member?, val members: List<
 data class Meta(val cats: List<Category>, val pms: List<PaymentMethod>)
 
 sealed interface Sub {
-    data class EditTxn(val txn: Txn?, val kind: String = "expense") : Sub
+    data class EditTxn(val txn: Txn?, val kind: String = "expense", val date: LocalDate? = null) : Sub
     data object Budgets : Sub
     data object Categories : Sub
     data object Members : Sub
@@ -89,7 +89,7 @@ fun MainScaffold(app: AppVM, g: Group) {
         }) { pad ->
             Box(Modifier.padding(pad).fillMaxSize()) {
                 when (sub) {
-                    is Sub.EditTxn -> TxnEditScreen(ctx, sub.txn, sub.kind, onSaved = { msg -> toast(msg); refresh++; pop() })
+                    is Sub.EditTxn -> TxnEditScreen(ctx, sub.txn, sub.kind, sub.date, onSaved = { msg -> toast(msg); refresh++; pop() })
                     Sub.Budgets -> BudgetScreen(ctx, month)
                     Sub.Categories -> CategoryScreen(ctx)
                     Sub.Members -> MemberScreen(ctx)

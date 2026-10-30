@@ -140,6 +140,7 @@ struct ReportView: View {
                     else {
                         Paper(padding: 12) {
                             let sorted = d.sum.byCategory.sorted { $0.amount > $1.amount }
+                            Donut(slices: sorted.map { DonutSlice(label: ctx.cat($0.categoryId)?.name ?? "不明", colorHex: ctx.cat($0.categoryId)?.color, amount: $0.amount) }, centerLabel: "支出", centerValue: d.sum.expense)
                             ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.cat(a.categoryId)?.name ?? "不明", colorHex: ctx.cat(a.categoryId)?.color, amount: a.amount, max: sorted[0].amount) }
                         }
                     }

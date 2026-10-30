@@ -168,10 +168,10 @@ fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit, mod
 
 // 一覧の上の月の切り替え（前の月・月名・次の月）
 @Composable
-fun MonthNav(label: String, onPrev: () -> Unit, onNext: (() -> Unit)?) {
+fun MonthNav(label: String, onPrev: () -> Unit, onNext: (() -> Unit)?, onLabel: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         SquareButton("前の月", onPrev) { Chevron(left = true) }
-        Text(label, Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(label, Modifier.weight(1f).then(if (onLabel != null) Modifier.clickable(onClick = onLabel).heightIn(min = 44.dp).wrapContentHeight() else Modifier), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         SquareButton("次の月", onNext) { Chevron(left = false) }
     }
 }
@@ -214,5 +214,32 @@ fun LineIcon(g: Glyph, color: Color, size: Dp = 22.dp) {
             Glyph.More -> { for (x in listOf(6f, 12f, 18f)) { p.moveTo(x * u, 12 * u); p.lineTo((x + 0.01f) * u, 12 * u) } }
         }
         drawPath(p, color, style = s)
+    }
+}
+
+// カテゴリの内訳のドーナツ（上位アプリの標準。色はカテゴリの色、切れ目は面の色で 2dp 空ける。真ん中に合計）
+data class Slice(val label: String, val colorHex: String?, val amount: Long)
+
+@Composable
+fun Donut(slices: List<Slice>, centerLabel: String, centerValue: Long, modifier: Modifier = Modifier) {
+    val total = slices.sumOf { it.amount }.coerceAtLeast(1)
+    val gap = T.card
+    Box(modifier.fillMaxWidth().height(200.dp).semantics { contentDescription = "$centerLabel ${jp.kakeibo.share.domain.Money.format(centerValue)} の内訳の円グラフ。数字は下の一覧にあります" }, contentAlignment = Alignment.Center) {
+        Canvas(Modifier.size(180.dp)) {
+            val stroke = 34.dp.toPx()
+            val r = size.minDimension - stroke
+            val tl = Offset((size.width - r) / 2, (size.height - r) / 2)
+            var start = -90f
+            for (s in slices) {
+                val sweep = 360f * s.amount / total
+                drawArc(parseColor(s.colorHex), start, sweep, false, tl, Size(r, r), style = Stroke(stroke))
+                if (slices.size > 1) drawArc(gap, start + sweep - 0.6f, 1.2f, false, tl, Size(r, r), style = Stroke(stroke + 2f))
+                start += sweep
+            }
+        }
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(centerLabel, color = T.sub, fontSize = 12.sp)
+            Text(jp.kakeibo.share.domain.Money.format(centerValue), color = T.ink, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"))
+        }
     }
 }
