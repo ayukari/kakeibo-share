@@ -150,7 +150,7 @@ struct SavingsEmpty: View {
     }
 }
 
-// 目標の封筒（上辺に封のかぶせの線。進み具合の棒に 25・50・75% の目盛り）
+// 目標の封筒（上辺に封のかぶせの線）。中に貯金箱（貯まった額で硬貨からお札に変わる。CoinBox.swift）
 struct Envelope: View {
     let ctx: GroupCtx
     let g: SavingsGoal
@@ -176,8 +176,8 @@ struct Envelope: View {
                 Text(Money.format(s.saved)).font(.system(size: 24, weight: .heavy)).monospacedDigit().foregroundStyle(Color.kInk)
                 Text(" / \(Money.format(g.target))").font(.system(size: 14)).foregroundStyle(Color.kSub)
             }
-            GoalMeter(ratio: s.ratio).padding(.top, 6).accessibilityLabel("\(g.name)の進み具合 \(Int((s.ratio * 100).rounded()))%")
-            HStack { ForEach(["0", "25%", "50%", "75%", "100%"], id: \.self) { t in Text(t).font(.system(size: 11)).foregroundStyle(Color.kSub).frame(maxWidth: .infinity, alignment: t == "0" ? .leading : t == "100%" ? .trailing : .center) } }.padding(.top, 2)
+            CoinBox(name: g.name, saved: s.saved, ratio: s.ratio).padding(.top, 10)
+            CoinSteps(saved: s.saved, done: s.done)
             SubText(Savings.pace(g, s)).padding(.top, 8)
             if let ms = Savings.milestone(target: g.target, rows: rows, today: today), ms.thisMonth {
                 Text(ms.text).font(.system(size: 14)).foregroundStyle(Color.kInk).padding(12).frame(maxWidth: .infinity, alignment: .leading).background(Color.kBg, in: paperShape).padding(.top, 10)
@@ -195,19 +195,6 @@ struct Envelope: View {
         }
         .padding(.horizontal, 16).padding(.bottom, 14)
         .background(Color.kCard, in: paperShape).overlay(paperShape.stroke(Color.kLine, lineWidth: 1))
-    }
-}
-
-struct GoalMeter: View {
-    let ratio: Double
-    var body: some View {
-        GeometryReader { g in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 2).fill(Color.kLine)
-                RoundedRectangle(cornerRadius: 2).fill(Color.kAccent).frame(width: g.size.width * min(max(ratio, 0), 1))
-                ForEach([0.25, 0.5, 0.75], id: \.self) { p in Rectangle().fill(Color.kCard.opacity(0.9)).frame(width: 1).offset(x: g.size.width * p) }
-            }
-        }.frame(height: 10)
     }
 }
 

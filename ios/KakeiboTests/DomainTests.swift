@@ -163,6 +163,14 @@ final class DomainTests: XCTestCase {
         XCTAssertNil(Savings.emergencyTarget([0, 0]))
     }
 
+    func testCoinTiers() {
+        XCTAssertEqual([0, 9_999, 10_000, 29_999, 30_000, 100_000, 499_999, 500_000].map { Savings.coinIndex($0) }, [0, 0, 1, 1, 2, 3, 3, 4])
+        XCTAssertEqual(Savings.nextCoin(8_000)?.coin.name, "100円玉"); XCTAssertEqual(Savings.nextCoin(8_000)?.left, 2_000)
+        XCTAssertEqual(Savings.nextCoin(99_999)?.coin.name, "千円札"); XCTAssertEqual(Savings.nextCoin(99_999)?.left, 1)
+        XCTAssertNil(Savings.nextCoin(800_000))
+        XCTAssertEqual(Savings.coinIndex(-500), 0)
+    }
+
     func testSavingsLeftover() {
         func b(_ cat: String?, _ amount: Int64, _ spent: Int64) -> BudgetStatus {
             BudgetStatus(budgetId: "b", scope: "group", categoryId: cat, memberId: nil, amount: amount, spent: spent, remaining: amount - spent, ratio: Double(spent) / Double(amount), over: spent > amount)

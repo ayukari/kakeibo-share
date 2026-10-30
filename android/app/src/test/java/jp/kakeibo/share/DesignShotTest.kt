@@ -55,9 +55,10 @@ class DesignShotTest {
     private fun txn(id: String, day: Int, cat: String, amount: Long, kind: String = "expense", recurring: String? = null, memo: String = "", month: LocalDate) =
         Txn(id, "g", kind, amount, "%04d-%02d-%02d".format(month.year, month.monthValue, day), cat, "m1", memo = memo, recurringId = recurring, createdBy = "u1")
 
-    private fun shot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
+    private fun shot(name: String, advanceMs: Long? = null, content: @androidx.compose.runtime.Composable () -> Unit) {
+        if (advanceMs != null) rule.mainClock.autoAdvance = false   // 動きの途中を撮る
         rule.setContent { KakeiboTheme { Column(Modifier.fillMaxWidth().background(T.bg).verticalScroll(rememberScrollState()).padding(16.dp)) { content() } } }
-        rule.waitForIdle()
+        if (advanceMs != null) rule.mainClock.advanceTimeBy(advanceMs) else rule.waitForIdle()
         val v = rule.activity.window.decorView
         v.measure(View.MeasureSpec.makeMeasureSpec(v.width.coerceAtLeast(1), View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(v.height.coerceAtLeast(1), View.MeasureSpec.EXACTLY))
         v.layout(0, 0, v.measuredWidth, v.measuredHeight)
@@ -105,6 +106,20 @@ class DesignShotTest {
         val ser = (11 downTo 0).map { k -> val d = today.withDayOfMonth(1).minusMonths(k.toLong()); SavingsPoint(d.toString(), if (k % 3 == 0) 0 else 10000L + k * 1500, if (k == 3) 5000 else 0) }
         val d = SavingsData(listOf(g1, g2), st, pb, ser, 280000, listOf(120000, 98000, 110000))
         shot("savings") { SavingsContent(c, d, today, {}, {}, null, {}, 20) {} }
+    }
+
+    @Test fun coinBox() {
+        shot("coinbox") {
+            listOf(5_000L to 0.05, 15_000L to 0.3, 60_000L to 0.5, 200_000L to 0.8, 600_000L to 1.0).forEach { (v, r) ->
+                Paper(Modifier.padding(bottom = 10.dp)) { Big(v); CoinBox("目標", v, r, Modifier.padding(top = 8.dp)); CoinSteps(v, r >= 1.0) }
+            }
+        }
+    }
+
+    @Test fun coinBoxFalling() {
+        shot("coinbox_falling", advanceMs = 900) {
+            listOf(60_000L to 0.5, 200_000L to 0.8).forEach { (v, r) -> Paper(Modifier.padding(bottom = 10.dp)) { CoinBox("目標", v, r) } }
+        }
     }
 
     @Test fun entry() {

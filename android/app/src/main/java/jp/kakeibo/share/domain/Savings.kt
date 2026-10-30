@@ -57,4 +57,14 @@ object Savings {
         val left = rows.sumOf { it.amount } - rows.sumOf { it.spent }
         return if (left > 0) left else null
     }
+
+    // 貯金箱の中身。貯まった額で、硬貨からお札に変わっていく（目標の大きさにかかわらず同じ段階）
+    data class Coin(val name: String, val short: String, val from: Long, val bill: Boolean)
+    val COINS = listOf(
+        Coin("10円玉", "10円", 0, false), Coin("100円玉", "100円", 10_000, false), Coin("500円玉", "500円", 30_000, false),
+        Coin("千円札", "千円札", 100_000, true), Coin("1万円札", "万札", 500_000, true),
+    )
+    fun coinIndex(saved: Long): Int = COINS.indexOfLast { saved >= it.from }.coerceAtLeast(0)
+    // 次の段階と、そこまでの残り（いちばん上なら null）
+    fun nextCoin(saved: Long): Pair<Coin, Long>? = COINS.getOrNull(coinIndex(saved) + 1)?.let { it to it.from - saved }
 }

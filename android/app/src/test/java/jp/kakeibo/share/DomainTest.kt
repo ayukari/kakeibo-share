@@ -150,6 +150,14 @@ class DomainTest {
         assertNull(Savings.emergencyTarget(listOf(0, 0)))
     }
 
+    @Test fun coinTiers() {
+        assertEquals(listOf(0, 0, 1, 1, 2, 3, 3, 4), listOf(0L, 9_999L, 10_000L, 29_999L, 30_000L, 100_000L, 499_999L, 500_000L).map { Savings.coinIndex(it) })
+        assertEquals("100円玉" to 2_000L, Savings.nextCoin(8_000)!!.let { it.first.name to it.second })
+        assertEquals("千円札" to 1L, Savings.nextCoin(99_999)!!.let { it.first.name to it.second })
+        assertNull(Savings.nextCoin(800_000))
+        assertEquals(0, Savings.coinIndex(-500))
+    }
+
     @Test fun savingsLeftover() {
         fun b(cat: String?, amount: Long, spent: Long) = BudgetStatus("b", "group", cat, null, amount, spent, amount - spent, spent.toDouble() / amount, spent > amount)
         assertEquals(6000L, Savings.leftover(listOf(b("c1", 40000, 36000), b("c2", 5000, 3000), b(null, 99999, 0))))

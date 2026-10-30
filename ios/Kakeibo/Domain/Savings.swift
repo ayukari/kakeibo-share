@@ -64,4 +64,18 @@ enum Savings {
         let left = rows.reduce(Int64(0)) { $0 + $1.amount } - rows.reduce(Int64(0)) { $0 + $1.spent }
         return left > 0 ? left : nil
     }
+
+    // 貯金箱の中身。貯まった額で、硬貨からお札に変わっていく（目標の大きさにかかわらず同じ段階）
+    struct Coin: Hashable { let name: String; let short: String; let from: Int64; let bill: Bool }
+    static let coins = [
+        Coin(name: "10円玉", short: "10円", from: 0, bill: false), Coin(name: "100円玉", short: "100円", from: 10_000, bill: false),
+        Coin(name: "500円玉", short: "500円", from: 30_000, bill: false), Coin(name: "千円札", short: "千円札", from: 100_000, bill: true),
+        Coin(name: "1万円札", short: "万札", from: 500_000, bill: true),
+    ]
+    static func coinIndex(_ saved: Int64) -> Int { max(0, coins.lastIndex { saved >= $0.from } ?? 0) }
+    // 次の段階と、そこまでの残り（いちばん上なら nil）
+    static func nextCoin(_ saved: Int64) -> (coin: Coin, left: Int64)? {
+        let i = coinIndex(saved) + 1
+        return i < coins.count ? (coins[i], coins[i].from - saved) : nil
+    }
 }

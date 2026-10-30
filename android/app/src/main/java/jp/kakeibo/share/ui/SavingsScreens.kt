@@ -138,7 +138,7 @@ private fun SavingsEmpty(ctx: GroupCtx, d: SavingsData, open: (Sub) -> Unit) {
     Faint("ここは記録です。お金を実際に移すのは、銀行の自動積立・自動振替などで行ってください。", Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp))
 }
 
-// 目標の封筒（上辺に封のかぶせの線。進み具合の棒に 25・50・75% の目盛り）
+// 目標の封筒（上辺に封のかぶせの線）。中に貯金箱（貯まった額で硬貨からお札に変わる）
 @Composable
 fun Envelope(ctx: GroupCtx, g: SavingsGoal, s: SavingsStatus, rows: List<PassbookRow>, today: LocalDate, onRecord: (() -> Unit)?, onEdit: (() -> Unit)?) {
     val line = T.line
@@ -160,8 +160,8 @@ fun Envelope(ctx: GroupCtx, g: SavingsGoal, s: SavingsStatus, rows: List<Passboo
             Text(Money.format(s.saved), color = T.ink, fontWeight = FontWeight.ExtraBold, fontSize = 24.sp, style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"))
             Text(" / ${Money.format(g.target)}", color = T.sub, fontSize = 14.sp, modifier = Modifier.padding(bottom = 3.dp))
         }
-        GoalMeter(s.ratio.toFloat(), g.name)
-        Row(Modifier.fillMaxWidth().padding(top = 2.dp)) { listOf("0", "25%", "50%", "75%", "100%").forEachIndexed { i, t -> Text(t, Modifier.weight(1f), color = T.sub, fontSize = 11.sp, textAlign = when (i) { 0 -> androidx.compose.ui.text.style.TextAlign.Start; 4 -> androidx.compose.ui.text.style.TextAlign.End; else -> androidx.compose.ui.text.style.TextAlign.Center }) } }
+        CoinBox(g.name, s.saved, s.ratio, Modifier.padding(top = 10.dp))
+        CoinSteps(s.saved, s.done)
         Sub(Savings.pace(g, s), Modifier.padding(top = 8.dp))
         val ms = Savings.milestone(g.target, rows, today)
         if (ms?.thisMonth == true) Text(ms.text, Modifier.fillMaxWidth().padding(top = 10.dp).clip(PaperShape).background(T.bg).padding(12.dp), color = T.ink, fontSize = 14.sp)
@@ -169,16 +169,6 @@ fun Envelope(ctx: GroupCtx, g: SavingsGoal, s: SavingsStatus, rows: List<Passboo
             if (onRecord != null && ctx.can("member")) OutlinedButton(onRecord, Modifier.weight(1f).heightIn(min = 44.dp), shape = ButtonShape) { Text("記録する", color = T.ink, fontWeight = FontWeight.Bold) }
             if (onEdit != null) TextButton(onEdit, Modifier.weight(1f).heightIn(min = 44.dp)) { Text("直す・記録を見る", color = T.sub) }
         }
-    }
-}
-
-@Composable
-private fun GoalMeter(ratio: Float, name: String) {
-    val track = T.line; val fill = T.accent; val card = T.card
-    Canvas(Modifier.fillMaxWidth().padding(top = 6.dp).height(10.dp).semantics { contentDescription = "${name}の進み具合 ${Math.round(ratio * 100)}%" }) {
-        drawRoundRect(track, size = size, cornerRadius = CornerRadius(2.dp.toPx()))
-        drawRoundRect(fill, size = Size(size.width * ratio.coerceIn(0f, 1f), size.height), cornerRadius = CornerRadius(2.dp.toPx()))
-        for (p in listOf(0.25f, 0.5f, 0.75f)) drawLine(card.copy(alpha = 0.9f), Offset(size.width * p, 0f), Offset(size.width * p, size.height), 1.dp.toPx())
     }
 }
 
