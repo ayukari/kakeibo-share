@@ -54,9 +54,11 @@ object Calc {
     }
 
     // 割合（%）で分けた金額。端数の円は、並びの先頭から 1 円ずつ（均等割りと同じ決まり）。合計が 100 でなければ null
+    // 比で分ける（60:40 の % でも、2:1:1 の口数でもよい）。割り切れない 1 円は前の人から
     fun ratioSplit(amount: Long, percents: List<Int>): List<Long>? {
-        if (percents.isEmpty() || percents.any { it < 0 } || percents.sum() != 100) return null
-        val base = percents.map { amount * it / 100 }
+        val sum = percents.sum()
+        if (percents.isEmpty() || percents.any { it < 0 } || sum <= 0) return null
+        val base = percents.map { amount * it / sum }
         var rest = amount - base.sum()
         return base.mapIndexed { i, b -> if (rest > 0 && percents[i] > 0) { rest--; b + 1 } else b }
     }

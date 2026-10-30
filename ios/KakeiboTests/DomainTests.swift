@@ -180,6 +180,9 @@ final class DomainTests: XCTestCase {
         XCTAssertEqual(Calc.ratioSplit(5, [34, 33, 33]), [2, 2, 1])
         XCTAssertEqual(Calc.ratioSplit(7, [50, 50]), [4, 3])
         XCTAssertEqual(Calc.ratioSplit(1000, [0, 100]), [0, 1000])
-        XCTAssertNil(Calc.ratioSplit(1000, [60, 30]))
+        XCTAssertEqual(Calc.ratioSplit(1000, [60, 30]), [667, 333])
+        XCTAssertEqual(Calc.ratioSplit(1000, [2, 1, 1]), [500, 250, 250])
+        XCTAssertEqual(Calc.ratioSplit(1000, [1, 1, 1]), [334, 333, 333])
+        XCTAssertNil(Calc.ratioSplit(1000, [0, 0]))
     }
 }

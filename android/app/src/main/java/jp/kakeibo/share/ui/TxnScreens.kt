@@ -60,7 +60,7 @@ fun TxnListScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit
         } else {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().testTag("search"), label = { Text("メモ・カテゴリで探す") }, singleLine = true)
+                    OutlinedTextField(q, { q = it }, Modifier.fillMaxWidth().testTag("search"), label = { Text("メモ・カテゴリ・人・金額で探す") }, singleLine = true)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf("all" to "すべて", "expense" to "支出", "income" to "収入").forEach { (k, l) -> FilterChip(kind == k, { kind = k }, { Text(l) }) }
                         Spacer(Modifier.weight(1f))
@@ -76,7 +76,8 @@ fun TxnListScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit
                 LoadableView(st, { vm.reload() }) { all ->
                     val list = all.filter { t ->
                         (kind == "all" || t.kind == kind) && (cat == null || t.categoryId == cat!!.id) && (payer == null || t.payerMemberId == payer!!.id) &&
-                            (q.isBlank() || t.memo.contains(q.trim(), true) || (ctx.cat(t.categoryId)?.name?.contains(q.trim(), true) == true))
+                            (q.isBlank() || t.memo.contains(q.trim(), true) || (ctx.cat(t.categoryId)?.name?.contains(q.trim(), true) == true) ||
+                                ctx.memberName(t.payerMemberId).contains(q.trim(), true) || t.amount.toString() == q.trim().replace(",", "").removePrefix("¥"))
                     }.let { l -> when (sort) { "old" -> l.reversed(); "amount" -> l.sortedByDescending { it.amount }; else -> l } }
                     val inc = list.filter { it.kind == "income" }.sumOf { it.amount }; val exp = list.filter { it.kind == "expense" }.sumOf { it.amount }
                     SectionLabel("${list.size} 件", "収入 ${Money.format(inc)}・支出 ${Money.format(exp)}")
@@ -189,7 +190,7 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
         val problem = amountErr ?: Validate.date(date) ?: (if (cat == null) "カテゴリを選んでください" else null) ?: (if (payer == null) "払った人を選んでください" else null) ?: Validate.memo(memo)
             ?: (if (split == "equal" && equal.isEmpty()) "割り勘する人を選んでください" else null)
             ?: (if (split == "custom") Validate.customSplit(a ?: 0, splitMembers.mapNotNull { custom[it.id]?.let(Money::parse) }) else null)
-            ?: (if (split == "ratio" && Calc.ratioSplit(a ?: 0, splitMembers.map { ratio[it.id]?.toIntOrNull() ?: 0 }) == null) "割合の合計を 100% にしてください" else null)
+            ?: (if (split == "ratio" && Calc.ratioSplit(a ?: 0, splitMembers.map { ratio[it.id]?.toIntOrNull() ?: 0 }) == null) "割合を 1 以上で入れてください" else null)
             ?: (if (!loadedSplits) "割り勘の内訳を読み込めていません" else null)
         if (problem != null) { if (problem != amountErr) error = problem; return null }   // 金額の誤りは入力欄の下に出す
         return TxnInput(txn?.id, txn?.version, requestId.ifEmpty { UUID.randomUUID().toString() }, kind, a!!, date.toString(), cat!!.id, payer!!.id, pm?.id, memo.trim(),
@@ -250,12 +251,12 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(m.displayName, Modifier.weight(1f), color = T.ink)
                             OutlinedTextField(ratio[m.id] ?: "", { v -> ratio[m.id] = v.filter(Char::isDigit).take(3) }, Modifier.width(96.dp), singleLine = true,
-                                suffix = { Text("%") }, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number))
                             Text(if (shares != null && a > 0) Money.format(shares[i]) else "", Modifier.width(88.dp), color = T.ink, textAlign = androidx.compose.ui.text.style.TextAlign.End)
                         }
                     }
                     val total = splitMembers.sumOf { ratio[it.id]?.toIntOrNull() ?: 0 }
-                    Text(if (total == 100) "合計 100%（6:4 なども自由に）" else "合計 $total%（100% にしてください）", color = if (total == 100) IncomeColor else OverColor, fontSize = 14.sp)
+                    Text(if (total > 0) "比 ${splitMembers.joinToString(":") { ratio[it.id]?.toIntOrNull()?.toString() ?: "0" }} で分けます（60:40 の % でも、大人 2・子ども 1 の口数でも）" else "割合を入れてください", color = if (total > 0) IncomeColor else OverColor, fontSize = 14.sp)
                 }
                 "custom" -> {
                     splitMembers.forEach { m -> AmountField(custom[m.id] ?: "", { custom[m.id] = it }, label = "${m.displayName}の負担") }

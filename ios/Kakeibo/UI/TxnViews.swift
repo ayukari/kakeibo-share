@@ -26,7 +26,7 @@ struct TxnListView: View {
             }.padding(.horizontal, 16).padding(.top, 8).padding(.bottom, 32)
         }
         .background(Color.kBg)
-        .searchable(text: $query, prompt: "メモ・カテゴリで探す")
+        .searchable(text: $query, prompt: "メモ・カテゴリ・人・金額で探す")
         .task(id: "\(month)-\(ctx.refresh)") { selDay = nil; await load() }
         .refreshable { await load() }
     }
@@ -60,11 +60,19 @@ struct TxnListView: View {
         }
     }
 
+    // メモ・カテゴリ・払った人・金額（1,200 や ¥1200 も可）で探す
+    private func matches(_ t: Txn, _ q: String) -> Bool {
+        if t.memo.localizedCaseInsensitiveContains(q) { return true }
+        if let c = ctx.cat(t.categoryId), c.name.localizedCaseInsensitiveContains(q) { return true }
+        if ctx.memberName(t.payerMemberId).localizedCaseInsensitiveContains(q) { return true }
+        return String(t.amount) == q.replacingOccurrences(of: ",", with: "").replacingOccurrences(of: "¥", with: "")
+    }
+
     private func filtered(_ all: [Txn]) -> [Txn] {
         let q = query.trimmingCharacters(in: .whitespaces)
         let l = all.filter { t in
             (kind == "all" || t.kind == kind) && (catId == nil || t.categoryId == catId) && (payerId == nil || t.payerMemberId == payerId) &&
-            (q.isEmpty || t.memo.localizedCaseInsensitiveContains(q) || (ctx.cat(t.categoryId)?.name.localizedCaseInsensitiveContains(q) ?? false))
+            (q.isEmpty || matches(t, q))
         }
         switch sort { case "old": return l.reversed(); case "amount": return l.sorted { $0.amount > $1.amount }; default: return l }
     }
@@ -227,12 +235,12 @@ struct TxnEditView: View {
                                 Text(m.displayName)
                                 Spacer()
                                 TextField("0", text: Binding(get: { ratio[m.id] ?? "" }, set: { ratio[m.id] = String($0.filter(\.isNumber).prefix(3)) })).keyboardType(.numberPad).multilineTextAlignment(.trailing).frame(width: 56)
-                                Text("%")
                                 Text(shares != nil && a > 0 ? Money.format(shares![i]) : "").monospacedDigit().frame(width: 88, alignment: .trailing)
                             }
                         }
                         let total = splitMembers.reduce(0) { $0 + (Int(ratio[$1.id] ?? "") ?? 0) }
-                        Text(total == 100 ? "合計 100%（6:4 なども自由に）" : "合計 \(total)%（100% にしてください）").foregroundStyle(total == 100 ? Color.income : Color.over)
+                        let ratioText = splitMembers.map { ratio[$0.id] ?? "0" }.joined(separator: ":")
+                        Text(total > 0 ? "比 \(ratioText) で分けます（60:40 の % でも、大人 2・子ども 1 の口数でも）" : "割合を入れてください").foregroundStyle(total > 0 ? Color.income : Color.over)
                     } else if split == "custom" {
                         ForEach(splitMembers) { m in
                             AmountField(label: "\(m.displayName)の負担", text: Binding(get: { custom[m.id] ?? "" }, set: { custom[m.id] = $0 }))
@@ -306,7 +314,7 @@ struct TxnEditView: View {
         if let e = Validate.memo(memo) { return e }
         if split == "equal" && equal.isEmpty { return "割り勘する人を選んでください" }
         if split == "custom", let e = Validate.customSplit(a, shares) { return e }
-        if split == "ratio" && Calc.ratioSplit(a, splitMembers.map { Int(ratio[$0.id] ?? "") ?? 0 }) == nil { return "割合の合計を 100% にしてください" }
+        if split == "ratio" && Calc.ratioSplit(a, splitMembers.map { Int(ratio[$0.id] ?? "") ?? 0 }) == nil { return "割合を 1 以上で入れてください" }
         if !splitsLoaded { return "割り勘の内訳を読み込めていません" }
         return nil
     }

@@ -176,6 +176,9 @@ class DomainTest {
         assertEquals(listOf(2L, 2L, 1L), Calc.ratioSplit(5, listOf(34, 33, 33)))
         assertEquals(listOf(4L, 3L), Calc.ratioSplit(7, listOf(50, 50)))
         assertEquals(listOf(0L, 1000L), Calc.ratioSplit(1000, listOf(0, 100)))
-        assertNull(Calc.ratioSplit(1000, listOf(60, 30)))
+        assertEquals(listOf(667L, 333L), Calc.ratioSplit(1000, listOf(60, 30)))
+        assertEquals(listOf(500L, 250L, 250L), Calc.ratioSplit(1000, listOf(2, 1, 1)))
+        assertEquals(listOf(334L, 333L, 333L), Calc.ratioSplit(1000, listOf(1, 1, 1)))
+        assertNull(Calc.ratioSplit(1000, listOf(0, 0)))
     }
 }

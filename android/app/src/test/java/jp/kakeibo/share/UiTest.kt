@@ -82,7 +82,7 @@ class UiTest {
         listOf("1", "00", "0", "+", "5", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
         rule.onNodeWithText("= ¥1,500").assertExists()
         rule.onNodeWithText("割合").performScrollTo().performClick()
-        rule.onNodeWithText("合計 100%（6:4 なども自由に）").performScrollTo().assertExists()
+        rule.onNodeWithText("比 50:50 で分けます（60:40 の % でも、大人 2・子ども 1 の口数でも）").performScrollTo().assertExists()
         rule.onAllNodesWithText("¥750", useUnmergedTree = true).assertCountEquals(2)
     }
 

@@ -58,9 +58,11 @@ enum Calc {
     }
 
     // 割合（%）で分けた金額。端数の円は、並びの先頭から 1 円ずつ。合計が 100 でなければ nil
+    // 比で分ける（60:40 の % でも、2:1:1 の口数でもよい）。割り切れない 1 円は前の人から
     static func ratioSplit(_ amount: Int64, _ percents: [Int]) -> [Int64]? {
-        if percents.isEmpty || percents.contains(where: { $0 < 0 }) || percents.reduce(0, +) != 100 { return nil }
-        let base = percents.map { amount * Int64($0) / 100 }
+        let sum = percents.reduce(0, +)
+        if percents.isEmpty || percents.contains(where: { $0 < 0 }) || sum <= 0 { return nil }
+        let base = percents.map { amount * Int64($0) / Int64(sum) }
         var rest = amount - base.reduce(0, +)
         return base.enumerated().map { i, b in
             if rest > 0 && percents[i] > 0 { rest -= 1; return b + 1 }

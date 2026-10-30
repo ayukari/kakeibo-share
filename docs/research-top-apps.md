@@ -66,3 +66,33 @@ Google Play で「家計簿」を検索した上位から、ダウンロード�
 - https://play.google.com/store/apps/details?id=com.realbyteapps.moneymanagerfree
 - https://play.google.com/store/apps/details?id=inc.osidori
 - https://play.google.com/store/apps/details?id=net.zaim.android
+
+# 先人調査 2: GitHub の公開ソースの家計簿・割り勘アプリ（2026-10-30、15 分）
+
+| リポジトリ | ★ | 種類 |
+|---|---|---|
+| maybe-finance/maybe | 54k | 個人の資産管理 |
+| actualbudget/actual | 29.8k | 封筒式の予算（余りを翌月に回す） |
+| firefly-iii/firefly-iii | 25k | 自前サーバーの家計簿（定期・ルール・貯金箱） |
+| mayswind/ezbookkeeping | 5.8k | 自前サーバーの家計簿 |
+| jameskokoska/Cashew | 4.8k | スマホの予算アプリ |
+| Ivy-Apps/ivy-wallet | 3.1k | Kotlin・Compose のスマホ家計簿 |
+| spliit-app/spliit | 3k | グループの割り勘 |
+| rarfell/dimeApp | 1.9k | SwiftUI のスマホ家計簿 |
+| oss-apps/split-pro | 1.4k | グループの割り勘 |
+| mtotschnig/MyExpenses | 1.2k | Android の家計簿 |
+
+## 見えた共通の作り
+
+- **割り勘の分け方**: split-pro は「均等・割合・口数（share）・金額・調整」。spliit も均等ではない分け方に対応している。
+- **探す**: spliit、Cashew、ezbookkeeping、Firefly III のどれにも検索がある。Cashew は日付・カテゴリ・金額でも絞り込める。
+- **ロック**: Cashew、Dime、MyExpenses は生体認証か端末のロックで守る。前回の調査で取り入れ済み。
+- **定期の記録、目標・貯金箱、CSV、精算の提案**: Firefly III、Cashew、spliit などにある。このアプリには取り入れ済み。
+- **予算の余りを翌月に回す**（Actual の rollover）と、**返金をマイナスの支出として扱う**（split-pro）: サーバーの集計を変える必要があるので、次の候補にする。
+
+## 今回入れたもの
+
+| 機能 | 参考 | このアプリ |
+|---|---|---|
+| 割り勘の「割合」 | split-pro（割合と口数） | 合計 100% の縛りをやめた。60:40 の % でも、大人 2・子ども 1 の口数でも同じ欄で分けられる |
+| 一覧の検索 | spliit、Cashew | メモ・カテゴリに加えて、払った人と金額（1,200 や ¥1200 も可）でも探せる |
