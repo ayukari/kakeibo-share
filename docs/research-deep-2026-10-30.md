@@ -257,3 +257,4 @@
 ## 19. 後半のまとめ（時間）
 - 22:04 開始、23:04 終了。後半（22:23〜）は、App Store のレビュー 19 アプリ 8,319 件の集計、上位アプリの画面の比較、一次資料での事実の確認、家族で共有したときの体験談と家計調査の 2025 年平均を、同時に調べた。私は Google Play の規模、まねーぼのレビュー、うちの入力画面と配色の確認などを調べた。
 - **パッケージ名の制限を自分でも確認**（22:59、[Google のヘルプ](https://support.google.com/android-developer-console/answer/17131204?hl=en)）: 「You can only register new package names that have never been seen before on Android.」すでにあるパッケージ名は「you will receive an error and will not be able to register it」。→ Limited Distribution に移るときは、パッケージ名を新しくして入れ直してもらう必要がありそう（家計簿のデータはサーバーにあるので消えない）。古いアプリから新しいアプリへの切り替えの案内を用意する。
+- **Google ログインの例外を自分でも確認**（23:00、[Google のヘルプ](https://support.google.com/cloud/answer/15549945?hl=en)）: 名前・メールアドレス・プロフィールだけを求めるなら、テストユーザーとして登録しなくてよく、警告も出ず、7 日で失効しない。家族だけで使うなら、Google ログインは追加の審査なしで使える。
