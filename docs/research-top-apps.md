@@ -112,3 +112,17 @@ Google Play で「家計簿」を検索した上位から、ダウンロード�
 | 降ってくる動き | 画面を開くと、置き場所の真上から 1 枚ずつ降って積もる（約 1.8 秒）。端末の「動きを減らす」設定のときは、はじめから積んだ形で出す |
 
 参考: [財務省 FAQ（通貨の模造）](https://www.mof.go.jp/faq/currency/07af.htm)・[財務省 貨幣の一覧](https://www.mof.go.jp/policy/currency/coin/general_coin/list.htm)・[Konfetti](https://github.com/DanielMartinus/Konfetti)・[ConfettiSwiftUI](https://github.com/simibac/ConfettiSwiftUI)
+
+# 先人調査 4: タダで使える硬貨・お札・札束の素材（2026-10-30）
+
+| 素材 | ライセンス | 中身 | 公開リポジトリに入れられるか |
+|---|---|---|---|
+| [いらすとや](https://www.irasutoya.com/p/faq.html) | 無料（著作権は放棄していない）。広告や課金のあるアプリは商用扱いで 1 作品 20 点まで。クレジット不要。色の変更は可 | [日本の硬貨（1・5・10・50・100・500円）](https://www.irasutoya.com/2019/04/blog-post_303.html)、[札束](https://www.irasutoya.com/2016/04/blog-post_3.html)、[新紙幣](https://www.irasutoya.com/2024/07/blog-post.html) | 要注意。「素材としての再配布」が禁止なので、誰でも画像を取り出せる公開リポジトリに置くのは避けたい |
+| [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji)（★10k） | MIT（ライセンス文を同梱すれば自由） | 立体の硬貨（金色、建物の柄）、帯付きの札束（¥）、お金の袋。平面の SVG もあり、色を変えられる | 可 |
+| [Quaternius の 3D モデル（Poly Pizza）](https://poly.pizza/search/coin) | CC0（権利放棄。表記も不要） | 積んだ硬貨（Coin Piles・Coins）、硬貨の袋。ローポリの 3D | 可（アプリでは画像に描き出して使う） |
+| [Kenney](https://kenney.nl/assets/platformer-kit) | CC0 | ゲーム用の硬貨のアイコン・3D | 可 |
+| [Twemoji](https://github.com/jdecked/twemoji) | CC-BY 4.0（表記が必要） | 🪙 💴 💰 | 可（表記を入れる） |
+| [OpenMoji](https://github.com/hfg-gmuend/openmoji) | CC-BY-SA 4.0（同じライセンスで配る義務） | 🪙 💴 💰 | 避けたい（アプリの素材全体に条件が及ぶ） |
+| [LottieFiles](https://help.lottiefiles.com/hc/en-us/articles/900002438343-Can-I-use-a-free-animation-on-Lottiefiles-for-commercial-business-use) | 無料の動きは Lottie Simple License（商用可）。作品ごとに条件の確認が必要 | 硬貨が落ちる動きなど | 作品による |
+
+- 本物の硬貨・お札の写真や、それに近い絵は避ける（[財務省 FAQ](https://www.mof.go.jp/faq/currency/07af.htm)）。いらすとやの硬貨・お札は、デフォルメした絵。
