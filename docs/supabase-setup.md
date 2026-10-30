@@ -41,6 +41,7 @@ Project Settings → API の **Project URL** と **anon public** キーだけを
 
 ## 実施状況（2026-10-28）
 - プロジェクト `kakeibo-share`（リージョン ap-northeast-2 ソウル）を社長が作成。
+- 返金と予算の繰り越し `20261030000600_refund_rollover.sql` は 2026-10-30 に適用。列 3 つ（is_refund・signed_amount・rollover）と、関数の権限（save_budget・budget_status は authenticated だけ、内部の _budget_* は誰も実行不可、save_budget の古い形は残っていない）を確認。
 - マイグレーション 5 本（4 本 + 貯金 20261029000500_savings.sql。貯金は 2026-10-29 に適用し、表 2・関数 8・ポリシー 2・履歴のトリガー 2 を確認。内部関数は authenticated から実行不可、anon は実行不可）を SQL Editor で適用済み（表 13・関数 45・履歴のトリガー 9・登録時のプロフィール作成のトリガー）。適用後に確認した結果:
   - 内部用の関数（`_` で始まるもの）は authenticated から実行できない。
   - ログインなし（anon）では、表の読み取りも `create_group` も権限エラー（42501）になる。
