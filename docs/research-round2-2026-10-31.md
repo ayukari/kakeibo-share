@@ -251,6 +251,45 @@
 
 **作らない方がよいもの**: 家族の順位・比較、毎日の督促、途切れた日数を大きく出すこと、赤字の警告の連続、給料日の前の先取りの促し、先取りの自動を外すこと。
 
+## 8. 日本の大きな Android アプリから学べること（調査担当 A）
+
+企業の製品アプリのソースは GitHub にほとんどなく（cookpad・line・mercari などはライブラリ・研修だけ）、読めるのは DroidKaigi の公式アプリ（2023〜2026、Apache-2.0）と個人・学生のアプリ。DroidKaigi 2026 は 29 モジュール・kt 1,008 ファイルで、うち（1 モジュール・kt 28 ファイル）がまねるのは、ファイル 1〜2 個で済む考え方だけ。
+
+### 8-1 うちのコードで見つかったこと（調査担当が読み、主なものは私も確認）
+- **取り直しで一覧が消える**: `Common.kt` 87〜90 行の `reload()` は、失敗すると表示中の `Ready` を捨てて `Failed` にする（私も確認）。電波の悪い所で読み直すと一覧が消える。DroidKaigi 2026（`docs/error-handling.md`）は、読み込みの失敗は全画面のエラー、書き込みや一部の失敗は Snackbar で中身を残す、の 2 層。
+- **保存するたびに読み込み中からやり直し**: ViewModel の key に `rev` が入っている箇所が 11 あり、保存のたびに新しい ViewModel ができる。
+- **家族の記録が画面に戻っても反映されない**: 読み直しは自分が保存した後だけ。`LifecycleResumeEffect`（lifecycle 2.9.4 で使える）で画面に戻ったら読み直す。
+- **タイムアウトで「保存はされていません」と言い切る**: supabase-kt 3.8.0 はタイムアウトを `HttpRequestTimeoutException`（初期 10 秒）で投げ、うちは `Repo.kt` 50〜55 行でどれも Network にして「（保存はされていません）」と出す（`AppError.kt` 60 行。私も確認）。書き込みの途中のタイムアウトでは実際には保存されていることがある。新規は `client_request_id` があるので押し直しても二重にならないが、編集を押し直すと `version` が合わず「ほかの人が先に変更しました」になる。→「保存できたか確かめられませんでした。もう一度押しても二重にはなりません」に。
+- **選択状態が読み上げられない**: BottomBar（`MainScaffold.kt` 136 行）、支出／収入の Segmented（`DesignKit.kt` 162 行）、CategoryGrid（`InputKit.kt` 86 行）は `.clickable` だけで、選ばれているかは色と枠でしか分からない。カレンダーの日は説明と中の Text が両方読まれ、曜日・今日・選択中が入っていない。カテゴリの丸は絵文字の名前まで読まれ、文字を大きくすると丸からはみ出す。日付の「<」「>」は 44dp で 48dp に足りない。9〜11sp の文字が 8 か所。
+- **スクリーンショットのテストが毎日変わる**: `DesignShotTest.kt` が `Money.todayJst()` を使っている（本体では 20 か所から直接呼んでいて、アプリを開いたまま日付が変わると「今日」が古いまま）。正解画像との比較もしていないので、見た目が崩れても CI は通る。
+- 曜日の表が 2 つある（`InputKit.kt` 31 行は月曜始まり、`AdminScreens.kt` 206 行は日曜始まり）。
+- 前回の調査書の誤り（読み上げの説明の場所）は、調査担当も同じ指摘をした（訂正済み）。
+
+### 8-2 DroidKaigi などの書き方
+- キャッシュ: 2026 `PersistedQueryKey.kt` はドメインのモデルではなく**サーバーの応答そのもの**を保存する（モデルを直してもキャッシュが壊れない。読めないものは「ない」扱い）。大きな応答は DataStore ではなくファイルへ（`docs/soil-persistence.md`）。接続先の名前をキーの頭に付けて本番と開発を混ぜない。3 年分とも pull-to-refresh や通信状態の監視はなく、キャッシュを先に出すだけ。
+- 送信待ち: Milktea（GPL、考え方だけ）`CreateNoteWorker.kt`・`DraftNoteDao.kt` は投稿をまず Room に下書き保存し、Worker が送る（前回の未確認「WorkManager と Room の送信待ちの日本の実装」の 1 例）。
+- 読み上げ: 2026 `KaigiNavigationBar.kt`（`selectableGroup` と `Role.Tab`）、`KaigiSegmentedButton.kt`（`Role.RadioButton`）。2025 `TimetableTimeSlot.kt`（`clearAndSetSemantics` で 1 回の読み上げにまとめる）、`TimetableItemCard.kt`（中の小さなボタンを読み上げから外して 2 回読まれないように）。日経の DroidKaigi 2023 の資料: 画面は「¥1,000」、読み上げは「1,000円」（`Money.spoken` 案の裏付け）。
+- 文字の大きさのテスト: 2024・2025 は Robolectric の `setFontScale` で 1.5・2.0・3.0 倍を撮る。DeNA の日本語の教材 `VisualRegressionTest_Advanced.md` も同じ方法。Roborazzi（Apache-2.0）の `roborazzi-accessibility-check` は 48dp 未満・低コントラスト・名前のない部品を検出できる。
+- 正解画像との比較: 2026 は main への push で正解画像を作って Actions の成果物に 30 日置き、次と比べる（リポジトリには入れない）。Roborazzi の FAQ は記録も比較も CI でと勧める。うちは PR を使わず main に直接 push するので、「前回の main の成果物と比べる」形が合う。
+- 時計: 2026 `KaigiClock.kt`・`FakeClock.kt`、`docs/clock.md`「画面の部品は時計を読まない」。
+- ウィジェット: 2026 `widget/FavoritesWidget.kt`（Glance 1.2.0、minSdk 23 なのでうちで使える）。ウィジェットは API のクライアントを持たず、保存した要約だけを読む。状態は純粋な関数で作ってふつうのテストで確かめる。表示が次に変わる時刻に WorkManager を 1 本だけ予約し、30 分ごとの更新は保険。`requestPinAppWidget` でアプリの中から置ける。
+- 通知: 2026 は時刻の正確でない `setAndAllowWhileIdle` を使う（正確なアラームは Android 14 以上で許可が要る）。再起動で予約し直す。許可は最初にお気に入りを付けた直後に聞き、端末の設定で切られている場合も扱う。Satena（MIT）は通知を `VISIBILITY_PUBLIC` にしており、家計簿でまねるとロック画面に金額が出る（悪い例）。
+- 日付と数字: JDK 17 で `ofPattern("M月d日(E)", Locale.JAPANESE)` は「10月31日(土)」、`NumberFormat.getCurrencyInstance(JAPAN)` は全角の「￥」。円の表示は今の `Money.format` のままでよい。
+
+### 8-3 調査担当 A の推奨
+| 優先 | 手間 | 内容 |
+|---|---|---|
+| 高 | 小 | 選択状態を読み上げさせる（BottomBar は `Role.Tab`、Segmented と CategoryGrid は `Role.RadioButton`）。カレンダーの日は `clearAndSetSemantics` で曜日・今日・選択中を入れる。カテゴリの丸は読み上げから外す。「<」「>」を 48dp に |
+| 高 | 小 | 時刻を差し替えられるようにする（`Money` に `java.time.Clock`）。テストは日付を固定する |
+| 高 | 小 | スクリーンショットのテストに 1.5 倍・2.0 倍の文字を足す（Big の金額、BottomBar、カレンダー） |
+| 高 | 小 | タイムアウトの文言を「保存できたか確かめられませんでした」に |
+| 中 | 小〜中 | 取り直しで表示を消さない、`rev` を key から外す、画面に戻ったら読み直す |
+| 中 | 小〜中 | Roborazzi で前回の main の画像と比べる。読み上げ・タップ領域のチェックを警告で |
+| 中 | 中 | 読み取りだけのキャッシュ（応答の JSON を利用者・家計簿・月ごとのファイルに。ログアウトで消す） |
+| 低 | 中 | Glance のウィジェット（今月の残り・給料日まで・記録ボタン。アプリのロックが有効なら金額を出さない） |
+| 低 | 小〜中 | 先取りの日の通知（ロック画面では PRIVATE） |
+| 低 | 小 | 曜日の表を 1 か所に、CI のアクションを SHA で固定、CoinBox の「アニメーションを削除」を ContentObserver で追う |
+
 <!-- AGENTS -->
 
 ## 未確認
