@@ -94,7 +94,7 @@
 - **和暦**: Android 8.0〜9（API 26〜28）には「令和」がない（AOSP の `JapaneseEra`）。元号の開始日を 5 行の表で自前に持つ。古い三井住友銀行の CSV（`H29.09.01`）やレシートにも使う。
 - **金額の読み取り**（「1万2千円」「1.2万」「千二百円」）: jikyo/suji4j（Apache-2.0）の計算部分（94 行）が候補。ただし「十分です」→10.01、全角カンマ、`1.2万3千` を誤るので直して移植する。
 - **文字の正規化**: 標準の `java.text.Normalizer` の NFKC で全角半角・半角カナ・`①`・`㈱`・`￥` はそろう。`〜`（U+301C）と `−`（U+2212）は別に置き換える。カタカナ↔ひらがなは文字コードを 0x60 ずらす。`android.icu.text.Transliterator` は API 29 からなので使わない。
-- **レシート**: tapreceipt の `src/receipt-parse.mjs`（448 行、テスト 22 件が通る。令和の日付、曜日での検算、税率別の検算。「令和元年」は読めない）を移植し、thangldw/kakeflow（MIT）の 8%/10% の行の扱いを足す。文字認識は ML Kit の日本語版（`com.google.mlkit:text-recognition-japanese`）。
+- **レシート**: tapreceipt の `src/receipt-parse.mjs`（448 行、テスト 22 件が通る。令和の日付、曜日での検算、税率別の検算。「令和元年」は読めない）を移植し、thangldw/kakeflow（MIT）の 8%/10% の行の扱いを足す。文字認識は ML Kit の日本語版（`com.google.mlkit:text-recognition-japanese`）。 kakeflow の `src/features/import/receiptText.ts` は「令和元年」の「元」も読む（77〜78 行）ので、tapreceipt の弱点はここから足せる（MIT の表示を残す）。
 - **CSV**
   - 読み込みは `com.jsoizo:kotlin-csv`（Apache-2.0）。文字コードは「厳密に UTF-8 → だめなら cp932」。juniversalchardet は三重ライセンスなので避ける。列名は NFKC をかけてから照合する。
   - 楽天カードは PC からしか取れず、PayPay はアプリで申請して 24 時間以内に取る。→「共有」「アプリで開く」でファイルを受け取る形にする。
