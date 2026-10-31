@@ -39,7 +39,9 @@ jobs:
             android/app/build/reports
             android/app/build/shots
 
+  # iOS 版は配らないので、ビルドを止めている（社長の判断 2026-10-31）。コードは残してある。動かすときは if を消す
   ios:
+    if: false
     runs-on: macos-15
     defaults: { run: { working-directory: ios } }
     steps:
