@@ -224,3 +224,15 @@ Next.js + Convex の Web アプリ（PWA）。2 人用、Stripe の有料プラ�
 - 4 つの調査（家計簿リポジトリ／割り勘・共有・お小遣い／日本向けの部品／Qiita・Zenn・note の開発記）を同時に進め、早く終わったものには追加の調査（未確認の点、締め日、高齢の家族向けなど）を頼んだ。Bonsai には任せていない（Web の文脈が要り、確かめる方が高くつくため）。
 - 取りまとめのときに一次資料で確かめたもの: うちの `equal_split`・`recur_freq`・`budgets`・並び順、tapreceipt の祝日の計算と holiday_jp の突き合わせ（2000〜2050 年）、pairbo の `calculateEqualSplit` と issue の一覧、mf-dashboard の固定費の定数、KakeiMatch の突き合わせの決まり、kakeflow の Vpass の列、PayPay の CSV の列（公式）、LINE の料金（公式）、内閣府の祝日 CSV、supabase-kt の `signInWith(IDToken)`、`JapaneseEra.REIWA` が API 30 から。
 - それ以外の行番号や件数は調査担当の報告による。使う前にその場で確かめる。
+
+## 主な記事（2026-10-31 に開けることを確認）
+
+- cotty: Supabase RLS https://zenn.dev/cotty/articles/836c135b44d5d6 、オフライン（アウトボックス）https://zenn.dev/cotty/articles/0397ff6f0db91b 、グループ間の共有 https://qiita.com/cotty/items/94ec391b88844f0f89d6
+- Warikani の集客 https://zenn.dev/risafj/articles/5d869d9eebfcb5
+- 端数 1 円と単位 https://qiita.com/sen-ltd/items/804f730291505f518cc1
+- Realtime の通信量 https://qiita.com/taski_app/items/0b79f6bb6bcecf74177d
+- RLS で 0 件でも 200 https://qiita.com/ennagara128/items/04dff43421e244e3dc30
+- Glance ウィジェット https://zenn.dev/morayl/articles/6e85dc0ff92a2a
+- WorkManager の通知 https://zenn.dev/nawa_10half/articles/android-workmanager-notification-migration
+- Sansan（DroidKaigi 2026）https://speakerdeck.com/sansantech/260903
+- LINE の料金 https://developers.line.biz/ja/docs/messaging-api/pricing/ 、PayPay の CSV https://paypay.ne.jp/help/c0447/ 、内閣府の祝日 https://www8.cao.go.jp/chosei/shukujitsu/gaiyou.html
