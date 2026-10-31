@@ -1,11 +1,11 @@
-# 先人調査（2 回目）2026-10-31 22:06〜23:06
+# 先人調査（2 回目）2026-10-31 22:06:12〜23:06:16（実測）
 
 1 回目（`docs/research-japanese-github-2026-10-31.md`）の続き。今回は、まだ手を付けていなかった 4 つを調査担当が同時に進め、私（取りまとめ役）は別の点を調べた。
 - 調査担当: (A) 日本の大きな Android アプリの作り、(B) Supabase の無料プランの運用、(C) 家計を続けさせる工夫、(D) APK を直接配るときの更新と署名
 - 私: 日本の家計の決まりごと、大手アプリの共有の仕方、うちのコードとライブラリの不具合の突き合わせ、色と読み上げの検証
 - Bonsai には任せていない（Web の文脈が要り、確かめる方が高くつくため）
 
-時刻は `date` で測った。開始 22:06:12、終わり 23:06:12。
+時刻は `date` で測った。開始 22:06:12、終わり 23:06:16（予定の 1 時間を使い切った）。
 
 ---
 
@@ -354,3 +354,54 @@
 - §8-1: `Common.kt` 87〜90 行の `reload()`、`Repo.kt` 50〜55 行の Network への分類、`AppError.kt` 60 行の文言。
 - §9: 限定配信の「まだ見られたことのない新しいパッケージ名だけ」と「最大 50 台」（ヘルプ 17131204 の本文）、マニフェストの権限が INTERNET だけ、`.gitignore` に鍵の除外がないこと、`applicationId`。
 - それ以外の行番号・件数・数字は調査担当の報告による。使う前にその場で確かめる。
+- 追加で確認（22:59）: `docs/backup-restore.md` の誤り 3 つ（8 行の `-n public` だけ・東京 `aws-0-ap-northeast-1`、17 行の `--disable-triggers`。実際のプロジェクトはソウル ap-northeast-2、`supabase-setup.md` 43 行）、`docs/test-results.md` 30 行「Supabase につないだ通しの確認も未」、ViewModel の key に `rev` が入る箇所 11、Actions の既定の権限 read、国内調査の数字（NilCraft の 30.0%・17.7%・16.3%・6.7%、Hajimari の 92%）を元の発表で確認。
+- §0 はまだ「可能性」。changelog は 2026-05-30 から数週間かけて順に既定にしたとあり、作成時のチェックの有無も記録がない。`has_table_privilege` の結果で決まる。
+- 前回の調査書の訂正: 読み上げの説明の場所（前回の文書を直した）、「払った人が端数を持つのが多い」は言い過ぎ（このファイルの §1-7 に記録）。
+- 追加で確認（23:00）: 日付の「<」「>」（DesignKit.kt 185 行の `size(44.dp)`）、下のタブ（MainScaffold.kt 142 行は `clickable` だけで選択状態の読み上げなし）。
+- 追加で確認（23:00）: 貯金の節目 25・50・75・100%（Savings.kt 37 行）、メインの目標は 1 つ（savings.sql 24 行の部分一意索引）、通知・連続記録・リアクションのコードがないこと（grep で 0 件）。
+- 追加で確認（23:00）: ライセンスと版 — tsumiki MIT、Ackpine Apache-2.0、epcltvapp MIT、DroidKaigi 2026 Apache-2.0、Roborazzi Apache-2.0（最新 1.77.0）、yhtye BSD-3-Clause、supabase/splinter はライセンス表記なし。
+- 追加で確認（23:00）: 標準の SMTP は「チームのメンバー宛てだけ・1 時間 2 通」（auth-smtp）、有料プランの $10 のコンピュートクレジット（compute）、一時停止の判定「過去 1 週間の十分な user database activity」と約 1 週間前の警告メール（free-project-pausing）。
+- 追加で確認（23:00）: GitHub 公式「公開リポジトリでは、60 日動きがないと schedule のワークフローが自動で無効になる」（events-that-trigger-workflows）。
+- 追加で確認（23:00）: 開発者確認の日程（developer-verification）— 2026-09-30 にブラジル・インドネシア・シンガポール・タイ、2027 年に世界へ。日本の日付はなし。
+- 追加で確認（23:01）: PackageInstaller.SessionParams の公式の説明に「自分自身の更新」と「UPDATE_PACKAGES_WITHOUT_USER_ACTION の宣言」が条件として並び、targetSdk の条件は今後の版で上がると書かれている。
+- 追加で確認（23:01）: GitHub 公式「GITHUB_TOKEN 以外の secrets は、フォークから起動したワークフローには渡らない」。
+- 追加で確認（23:01）: GitHub 公式「write 権限のある人は全 secrets を読める」「構造化したデータを secret にしない（伏せ字が効かない）」（secure-use）。
+- 追加で確認（23:01）: Supabase 公式（platform/backups）「無料プランのプロジェクトは CLI の db dump で定期的に書き出し、別の場所に控えを持つことを勧める」。
+- 追加で確認（23:01）: DeployGate のフリープラン（公式の料金ページ）— メンバー最大 2 名、1 プロジェクト、2 アプリ、ストレージ合計 1GB、過去の版は 90 日・500 件。「機能をお試しできる無料プラン」と書かれている。
+- 追加で確認（23:01）: Firebase App Distribution（公式 troubleshooting）— 招待は 30 日で失効、150 日より古いリリースは消える。
+- 追加で確認（23:01）: Play Protect の開発者向けガイドには「Play Protect の警告の分類にも異議を出せる」とある。§9-5 の「異議申し立てでは消えない」は「スキャンに送信」の画面についての調査担当の読みで、警告全般の話ではない。
+- 追加で確認（23:01）: Android 8.0（API 26）で「不明なアプリ」の扱いが変わった（従来の全体設定 INSTALL_NON_MARKET_APPS は常に 1、公式の 8.0 の変更点）。
+- 追加で確認（23:02）: Google code scanner はアプリにカメラの権限を求めずに読める（ML Kit 公式）。
+- 追加で確認（23:02）: Supabase 公式（IPv4/IPv6、2026-10-13 更新）— 直接接続は IPv6。IPv6 が使えない環境は Connect から共有プーラー（Supavisor、IPv4）の接続文字列を使う。
+- 追加で確認（23:02）: backup_reader の作り方（bypassrls・pg_read_all_data・default_transaction_read_only）は Supabase 公式の troubleshooting の手順どおり。
+- 追加で確認（23:02）: Supabase 公式の CI バックアップの例に「公開リポジトリにバックアップしない」とある（deployment/ci/backups）。
+- 追加で確認（23:02）: GitHub changelog「Releases now expose digests for release assets」（2025-06-03）。
+- 追加で確認（23:02）: GitHub の REST API は認証なしで 1 時間 60 回まで（アプリ内更新の確認は 1 日 1 回で十分に収まる）。
+- 追加で確認（23:02）: OTP とマジックリンクは既定で 60 秒に 1 回まで・1 時間で失効（auth-email-passwordless）。テンプレートでコードを出すのは `{{ .Token }}`。
+- 追加で確認（23:02）: Supabase changelog 34270「2025-04-21 から auth・storage・realtime スキーマへの SQL を制限」（戻すときに auth の表へデータを入れられるかに関わる。細部は未確認）。
+- 追加で確認（23:02）: 漏れたパスワードの拒否は Pro 以上（password-security）。Free では点検の警告が残る。
+- 追加で確認（23:03）: 無料のプロジェクトは 2 つまで（Owner か Administrator の全組織を通して。billing-on-supabase）。戻す練習用の 2 つ目を作る余地はある。
+- 追加で確認（23:03）: Resend の Supabase 用 SMTP 設定（smtp.resend.com・465・ユーザー名 resend・パスワードは API キー。Resend 公式）。
+- 追加で確認（23:03）: Brevo の無料は 1 日 300 通（Brevo の料金ページ）。
+- 追加で確認（23:03）: Amazon SES の送信は 1,000 通 $0.10（AWS の料金ページ）。
+- 追加で確認（23:03）: GitHub Free の Actions は非公開リポジトリで Artifact 500 MB と月 $12 分の計算量（GitHub の料金の説明）。
+- 追加で確認（23:03）: 限定配信の端末の許可リンクは 7 日で失効（ヘルプ 17131204）。
+- 追加で確認（23:03）: 高度なフローは 1 回限りで、完了までに 24 時間かかる（Android ヘルプ 17588095）。
+- 追加で確認（23:04）: Silverman & Barasch の研究の紹介（コロラド大学ボルダー校の記事）—「連続が途切れると、その活動自体をやめやすい」。
+- 追加で確認（23:04）: Bidargaddi ほか 2018（PMC6293241）— 通知で 24 時間以内に使う確率 +3.9%、週末 +8.7%。
+- 追加で確認（23:04）: Guttman-Kenney ほか（NBER w31926）— 最低額の自動払いの登録 36.9%→9.6%、カードの借金は減らなかった。
+- 追加で確認（23:04）: Olafsson & Pagel（NBER w23945）— 収入が入ると口座を見る（ログインのデータ）。
+- 追加で確認（23:04）: Medina & Pagel（NBER w28956、2025-09 改訂）— 310 万人の銀行の顧客に貯金を促す実験。
+- 追加で確認（23:04）: Ashraf・Karlan・Yin（J-PAL）— 引き出しにくい貯金口座で、残高が 6 か月後 +42%、1 年後 +82%。
+- 追加で確認（23:04）: Duolingo のブログ — 週末の救済で 1 週間後に戻る人 +4%・途切れる人 −5%、7 日目の継続 +14%。
+- 追加で確認（23:04）: Olson ほか（Kellogg の記事）— 婚約中か新婚の 230 組で調べた。
+- 追加で確認（23:04）: 調査担当 C の主な出典（IZA dp6311、Harkin ほか、Dai ほか、博報堂教育財団、NilCraft 2 本目、Columbia の goal-gradient）がどれも開けること。
+- 追加で確認（23:05）: 調査担当 A・B・D の主な出典（DroidKaigi 2026、日経の DroidKaigi 2023 の資料、Ackpine、Zenn の鍵の記事、Qiita の keep-alive の記事）が開けること。
+- 追加で確認（23:05）: 調査担当 B の出典（Qiita ryu0947・satoshi_061、Zenn seekseep、werdy、reciprocalapp）が開けること。
+- 追加で確認（23:05）: 調査担当 C・D の GitHub の出典（epcltvapp、yhtye、tsumiki、fuutou-chokin、ganbari-quest）が開けること。
+- 追加で確認（23:05）: 私の §1 の出典（powersync-kotlin、EldiaAndroid-public、supabase-kt #1338・#1421・#1438）が開けること。
+- 追加で確認（23:05）: 私の §2・§5 の出典（国税庁の医療費集計フォーム、弥生のサポート、香川県の児童手当、LINE ヤフーの発表、msoffice_UD_color）が開けること。
+- 追加で確認（23:05）: 私の §0・§2・§3・§4 の出典（PFU、MF のサポート、PayPay のヘルプ、OsidOri、Supabase changelog 45329）が開けること。
+- 追加で確認（23:05）: §1・§6 の公式の出典（http-status-codes、free-project-pausing、supabase-kt 3.8.0 の TROUBLESHOOTING.md、database-advisors）が開けること。
+- 追加で確認（23:06）: §9・§4 の公式の出典（developer-verification、ヘルプ 17131204、ML Kit code scanner、総務省の収支項目分類 2025）が開けること。
+- 追加で確認（23:06）: supabase-kt PR #1339（未マージ）、Obtainium #2634、F-Droid の再現できるビルドの説明が開けること。
