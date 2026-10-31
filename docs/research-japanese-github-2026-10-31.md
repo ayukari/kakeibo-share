@@ -7,7 +7,7 @@
 ## ライセンスの扱い（このリポジトリは公開している）
 
 - **MIT・Apache-2.0**: 著作権表示とライセンス文を残せば使える。
-  - KakeiBonByRust、mf-dashboard、sanataro（README にだけ記載）、KakeiMatch、duo-pocketbook、okanjo、super-seisan、zaim-csv-converter、holiday_jp、tsumiki、home-pocket-app（Apache-2.0。NOTICE が要る）
+  - KakeiBonByRust、mf-dashboard、sanataro（README にだけ記載）、KakeiMatch、duo-pocketbook、okanjo、super-seisan、zaim-csv-converter、holiday_jp、holidays-jp、shimebi、kakeflow、home-account、msoffice_UD_color、android-compose-furigana、tsumiki、suji4j（Apache-2.0）、kotlin-csv（Apache-2.0）、home-pocket-app（Apache-2.0。NOTICE が要る）
 - **コードは写さず、考え方だけ参考にする**:
   - GPL-3.0: Saifu_Android、歳時記帳
   - Sustainable Use License: iikanji-kakeibo
@@ -218,3 +218,9 @@ Next.js + Convex の Web アプリ（PWA）。2 人用、Stripe の有料プラ�
 - Warikani の同期方式。
 - supabase-kt の `signInWith(IDToken)` と Credential Manager を一緒に使う日本の実例（仕組みは別々のリポジトリで確認）。supabase-kt の公式リファレンスでは `signInWith(IDToken) { idToken = …; provider = Google; nonce = … }` の形で nonce を渡せる。Google には SHA-256 した値、Supabase には元の値を渡す（Supabase 側でハッシュして ID トークンの中の値と比べるため）。
 - WorkManager と Room で送信待ちをバックグラウンドで送る日本の実装。
+
+## 調べ方と分担
+
+- 4 つの調査（家計簿リポジトリ／割り勘・共有・お小遣い／日本向けの部品／Qiita・Zenn・note の開発記）を同時に進め、早く終わったものには追加の調査（未確認の点、締め日、高齢の家族向けなど）を頼んだ。Bonsai には任せていない（Web の文脈が要り、確かめる方が高くつくため）。
+- 取りまとめのときに一次資料で確かめたもの: うちの `equal_split`・`recur_freq`・`budgets`・並び順、tapreceipt の祝日の計算と holiday_jp の突き合わせ（2000〜2050 年）、pairbo の `calculateEqualSplit` と issue の一覧、mf-dashboard の固定費の定数、KakeiMatch の突き合わせの決まり、kakeflow の Vpass の列、PayPay の CSV の列（公式）、LINE の料金（公式）、内閣府の祝日 CSV、supabase-kt の `signInWith(IDToken)`、`JapaneseEra.REIWA` が API 30 から。
+- それ以外の行番号や件数は調査担当の報告による。使う前にその場で確かめる。
