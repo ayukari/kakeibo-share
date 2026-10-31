@@ -169,8 +169,8 @@
 
 ## 未確認
 
-- 通知の読み取り（NotificationListener）の Play での扱い。
+- 通知の読み取り（NotificationListener）の Play での扱い（Google の公式の記載は見つからない）。うちは Play に出さず APK を直接配るので、Play の審査は当たらない。ただし通知の中身は端末から外に出さない。
 - holiday_jp の将来の春分・秋分。
 - Warikani の同期方式。
-- supabase-kt の `signInWith(IDToken)` と Credential Manager を一緒に使う日本の実例（仕組みは別々のリポジトリで確認）。
+- supabase-kt の `signInWith(IDToken)` と Credential Manager を一緒に使う日本の実例（仕組みは別々のリポジトリで確認）。supabase-kt の公式リファレンスでは `signInWith(IDToken) { idToken; provider = Google; nonce }` の形で nonce を渡せる。Google には SHA-256 した値、Supabase には元の値を渡す（Supabase 側でハッシュして ID トークンの中の値と比べるため）。
 - WorkManager と Room で送信待ちをバックグラウンドで送る日本の実装。
