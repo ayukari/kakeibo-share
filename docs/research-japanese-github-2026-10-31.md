@@ -134,7 +134,7 @@
 
 ## 7. 日本ならではの作り
 
-- 精算の結果を **LINE に貼る文面**で送るのが中心の操作（tabiwari、smart-warikan など）。Android では `ACTION_SEND` で `jp.naver.line.android` を指定し、なければ普通の共有（TatekaeMaru）。
+- 精算の結果を **LINE に貼る文面**で送るのが中心の操作（tabiwari、smart-warikan など）。Android では `ACTION_SEND` で `jp.naver.line.android` を指定し、なければ普通の共有（TatekaeMaru）。 作るときは `startActivity` を try/catch で包む。Android 11 以降のパッケージの見え方の制限で LINE が見つからない扱いになるのを避けるため、マニフェストに `<queries><package android:name="jp.naver.line.android"/></queries>` を書いておくのが安全（`setPackage` との関係は公式の記載を確認していない）。
 - 文面の型: tabiwari は【名前 の精算】「▼ 送金してください」「A → B　¥1,000」、全部すめば「精算はすべて完了」、単位でまとめたら注記。**合計や各自の額はオンにしたときだけ載せる**。TatekaeMaru は精算結果・各自負担額・明細・合計を全部載せる。
   - うちの案: 【グループ名 ○月の精算】→「▼ 送金してください」→「A → B　¥」→「次は○○さんが払うとつり合います」→ 単位の注記。個人の額は初期値では載せない（家族のお金を LINE に流しすぎない）。
 - LINE 公式アカウント（Bot を作る場合）: 無料プランは月 200 通。送られた発言への返信は数えない。Bot から自分で送ると送り先の人数分数える（LINE Developers の料金の資料）。うちはアプリから共有するだけなので関係しない。
