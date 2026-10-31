@@ -57,7 +57,7 @@ sealed interface Sub {
     data class Goal(val goal: SavingsGoal?, val presetName: String? = null, val presetTarget: Long? = null) : Sub
 }
 
-private enum class Tab(val label: String, val glyph: Glyph) { Home("ホーム", Glyph.Home), Txns("収支", Glyph.List), Save("貯金", Glyph.Save), Settle("精算", Glyph.Swap), Report("レポート", Glyph.Chart), More("その他", Glyph.More) }
+private enum class Tab(val label: String, val glyph: Glyph) { Home("ホーム", Glyph.Home), Txns("収支", Glyph.List), Save("貯金", Glyph.Save), Settle("精算", Glyph.Swap), More("その他", Glyph.More) }   // 5 つまで（レポートは「収支」の中）
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,7 +124,6 @@ fun MainScaffold(app: AppVM, g: Group) {
                     Tab.Save -> SavingsScreen(ctx, push)
                     Tab.Txns -> TxnListScreen(ctx, month, { month = it }, open = push)
                     Tab.Settle -> SettlementScreen(ctx)
-                    Tab.Report -> ReportScreen(ctx, month, { month = it })
                     Tab.More -> MoreScreen(ctx, push)
                 }
             }
@@ -222,7 +221,7 @@ fun DashboardContent(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean, o
                         SectionLabel("カテゴリ")
                         Paper(padding = 12.dp) {
                             val sorted = d.sum.byCategory.filter { it.amount > 0 }.sortedByDescending { it.amount }
-                            sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount) }
+                            sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount, ctx.cat(a.categoryId)?.icon, sorted.sumOf { it.amount }) }
                         }
                     }
                     SectionLabel("最近の記録")
@@ -266,7 +265,7 @@ private fun BudgetPaper(ctx: GroupCtx, d: Dash, month: LocalDate, isCur: Boolean
             val name = ctx.cat(b.categoryId)?.name ?: "全体"
             Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (b.categoryId != null) { CategoryDot(name, ctx.cat(b.categoryId)?.color, 14.dp); Spacer(Modifier.width(8.dp)) }
+                    if (b.categoryId != null) { CategoryDot(name, ctx.cat(b.categoryId)?.color, 22.dp, ctx.cat(b.categoryId)?.icon); Spacer(Modifier.width(8.dp)) }
                     Text(name, Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text("${Money.format(b.spent)} / ${Money.format(b.amount)}", color = T.sub, fontSize = 14.sp)
                 }
@@ -323,7 +322,7 @@ private fun LegendItem(c: Color, text: String) {
 fun TxnRow(ctx: GroupCtx, t: Txn, onClick: () -> Unit) {
     val c = ctx.cat(t.categoryId)
     val sub = "${t.occurredOn.substring(5).replace('-', '/')}・${ctx.memberName(t.payerMemberId)}" + (if (t.isRefund) "が受け取った返金" else "が払った") + (if (t.splitMode != "none") "・割り勘" else "") + (if (t.visibility == "private") "・自分だけ" else "")
-    ItemRow((c?.name ?: "不明") + (if (t.memo.isNotBlank()) "・${t.memo}" else ""), sub, (if (t.kind == "income" || t.isRefund) "+" else "") + Money.format(t.amount), c?.name, c?.color, onClick = onClick)
+    ItemRow((c?.name ?: "不明") + (if (t.memo.isNotBlank()) "・${t.memo}" else ""), sub, (if (t.kind == "income" || t.isRefund) "+" else "") + Money.format(t.amount), c?.name, c?.color, catIcon = c?.icon, onClick = onClick)
 }
 
 // ---------- その他 ----------

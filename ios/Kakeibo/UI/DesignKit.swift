@@ -14,7 +14,7 @@ extension Color {
     static let kCard = Color(light: 0xFCFCFA, dark: 0x1A1B1E)
     static let kInk = Color(light: 0x16181D, dark: 0xECEEF1)
     static let kSub = Color(light: 0x5B616B, dark: 0xA7ACB5)
-    static let kFaint = Color(light: 0x6F747E, dark: 0x858B95)
+    static let kFaint = Color(light: 0x646973, dark: 0x858B95)   // 灰色の背景でもコントラスト 4.5 以上（WCAG）
     static let kLine = Color(light: 0xCDD1D6, dark: 0x33363C)
     static let kAccent = Color(light: 0x0E7656, dark: 0x47C79B)
     static let kAccent2 = Color(light: 0xDCEFE7, dark: 0x16302A)
@@ -117,14 +117,19 @@ struct KeyValue: View {
 }
 
 // カテゴリの色の丸（色は点・棒・アイコンだけ。文字には使わない）。中は名前の頭の 1 文字
+// カテゴリの色の丸。中はカテゴリの絵文字（なければ名前の頭の 1 文字）
 struct CategoryDot: View {
     let name: String?
     let colorHex: String?
     var size: CGFloat = 40
+    var icon: String? = nil
     var body: some View {
         ZStack {
             Circle().fill(Color.fromHex(colorHex))
-            if size >= 20 { Text(String((name ?? "?").prefix(1))).font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(.white) }
+            if size >= 20 {
+                if let icon, !icon.trimmingCharacters(in: .whitespaces).isEmpty { Text(icon).font(.system(size: size * 0.5)) }
+                else { Text(String((name ?? "?").prefix(1))).font(.system(size: size * 0.42, weight: .bold)).foregroundStyle(.white) }
+            }
         }.frame(width: size, height: size).accessibilityHidden(true)
     }
 }
@@ -137,9 +142,10 @@ struct ItemRow: View {
     let catName: String?
     let catColor: String?
     var amountColor: Color = .kInk
+    var catIcon: String? = nil
     var body: some View {
         HStack(spacing: 12) {
-            CategoryDot(name: catName, colorHex: catColor)
+            CategoryDot(name: catName, colorHex: catColor, icon: catIcon)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.system(size: 16, weight: .bold)).foregroundStyle(Color.kInk).lineLimit(1)
                 Text(sub).font(.system(size: 12)).foregroundStyle(Color.kFaint).lineLimit(1)
@@ -169,16 +175,18 @@ struct Meter: View {
     }
 }
 
-// カテゴリの横棒
+// カテゴリの横棒。total を渡すと、全体に占める割合（%）も出す
 struct CategoryBar: View {
     let name: String
     let colorHex: String?
     let amount: Int64
     let max: Int64
+    var icon: String? = nil
+    var total: Int64? = nil
     var body: some View {
         HStack(spacing: 10) {
             HStack(spacing: 8) {
-                CategoryDot(name: name, colorHex: colorHex, size: 26)
+                CategoryDot(name: name, colorHex: colorHex, size: 26, icon: icon)
                 Text(name).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kInk).lineLimit(1)
             }.frame(width: 112, alignment: .leading)
             GeometryReader { g in
@@ -186,6 +194,7 @@ struct CategoryBar: View {
                     .frame(width: g.size.width * CGFloat(Swift.max(0.015, Double(amount) / Double(Swift.max(max, 1)))), height: 12)
                     .frame(maxHeight: .infinity, alignment: .center)
             }.frame(height: 12)
+            if let total, total > 0 { Text("\(Int((Double(amount) * 100 / Double(total)).rounded()))%").font(.system(size: 12)).monospacedDigit().foregroundStyle(Color.kSub) }
             Text(Money.format(amount)).font(.system(size: 14, weight: .bold)).monospacedDigit().foregroundStyle(Color.kInk).lineLimit(1).frame(minWidth: 84, alignment: .trailing)
         }.frame(minHeight: 44).accessibilityElement(children: .combine)
     }

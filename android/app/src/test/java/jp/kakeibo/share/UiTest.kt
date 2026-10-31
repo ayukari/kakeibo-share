@@ -55,7 +55,7 @@ class UiTest {
     @Test fun transactionFormRejectsEmptyAmount() {
         val c = ctx("member")
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
-        rule.onNodeWithTag("save").performScrollTo().performClick()
+        rule.onNodeWithTag("save").performClick()
         rule.onNodeWithText("金額は 1 円以上の整数で入れてください", useUnmergedTree = true).assertExists()
     }
 
@@ -63,7 +63,7 @@ class UiTest {
         val c = ctx("member")
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
         listOf("1", "2", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
-        rule.onNodeWithTag("save").performScrollTo().performClick()
+        rule.onNodeWithTag("save").performClick()
         rule.onNodeWithTag("txnError").assertTextEquals("カテゴリを選んでください")
     }
 
@@ -71,6 +71,7 @@ class UiTest {
         val c = ctx("member")
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
         listOf("1", "000").forEach { k -> if (k == "000") { rule.onNodeWithTag("key_00").performScrollTo().performClick(); rule.onNodeWithTag("key_0").performScrollTo().performClick() } else rule.onNodeWithTag("key_$k").performScrollTo().performClick() }
+        rule.onNodeWithTag("details").performScrollTo().performClick()   // 割り勘は「くわしく」の中
         rule.onNodeWithText("金額").performScrollTo().performClick()
         rule.onNodeWithText("あきの負担").performScrollTo().performTextInput("600")
         rule.onNodeWithText("合計 ¥600（あと ¥400）").assertExists()
@@ -81,6 +82,7 @@ class UiTest {
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
         listOf("1", "00", "0", "+", "5", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
         rule.onNodeWithText("= ¥1,500").assertExists()
+        rule.onNodeWithTag("details").performScrollTo().performClick()
         rule.onNodeWithText("割合").performScrollTo().performClick()
         rule.onNodeWithText("比 50:50 で分けます（60:40 の % でも、大人 2・子ども 1 の口数でも）").performScrollTo().assertExists()
         rule.onAllNodesWithText("¥750", useUnmergedTree = true).assertCountEquals(2)
@@ -89,10 +91,20 @@ class UiTest {
     @Test fun refundToggleChangesLabels() {
         val c = ctx("member")
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
-        rule.onNodeWithText("支出を記録する").performScrollTo().assertExists()
+        rule.onNodeWithText("支出を記録する").assertExists()
+        rule.onNodeWithTag("details").performScrollTo().performClick()
         rule.onNodeWithTag("refund").performScrollTo().performClick()
-        rule.onNodeWithText("返金を記録する").performScrollTo().assertExists()
+        rule.onNodeWithText("返金を記録する").assertExists()
         rule.onNodeWithText("受け取った人").assertExists()
+    }
+
+    @Test fun detailsSummaryShowsPayerAndCollapsesOptions() {
+        val c = ctx("member")
+        rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
+        // ふだんは「くわしく」が閉じていて、払った人などは 1 行の要約だけ
+        rule.onNodeWithText("あきが払った", substring = true).assertExists()
+        rule.onNodeWithTag("refund").assertDoesNotExist()
+        rule.onNodeWithTag("save").assertIsDisplayed()   // 保存ボタンはスクロールしなくても見える
     }
 
     @Test fun categoryTilesSelect() {
@@ -100,7 +112,7 @@ class UiTest {
         rule.setContent { KakeiboTheme { TxnEditScreen(c, null, "expense") {} } }
         rule.onNodeWithTag("cat_食費").performScrollTo().performClick()
         listOf("8", "00").forEach { rule.onNodeWithTag("key_$it").performScrollTo().performClick() }
-        rule.onNodeWithTag("save").performScrollTo().performClick()
+        rule.onNodeWithTag("save").performClick()
         // 入力の誤りが出ないこと（そのあとの送信はテストではサーバーに届かず、通信のエラーが出るかどうかはタイミングしだいなので見ない）
         rule.onNodeWithText("カテゴリを選んでください").assertDoesNotExist()
         rule.onNodeWithText("金額は 1 円以上の整数で入れてください").assertDoesNotExist()

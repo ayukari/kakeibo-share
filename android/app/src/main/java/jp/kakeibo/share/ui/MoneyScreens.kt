@@ -120,11 +120,11 @@ fun SettlementScreen(ctx: GroupCtx) {
 data class ReportData(val series: List<MonthPoint>, val sum: MonthSummary)
 
 @Composable
-fun ReportScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit) {
+fun ReportScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit, header: (androidx.compose.foundation.lazy.LazyListScope.() -> Unit)? = null) {
     val vm: LoadVM<ReportData> = viewModel(key = "report-${ctx.g.id}-r${ctx.rev}-$month") { LoadVM { ReportData(ctx.repo.monthlySeries(ctx.g.id, month, 6), ctx.repo.monthSummary(ctx.g.id, month)) } }
     val st by vm.state.collectAsState()
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
-        item { MonthBar(month, setMonth) }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 112.dp)) {
+        if (header != null) header() else item { MonthBar(month, setMonth) }
         item {
             LoadableView(st, { vm.reload() }) { d ->
                 Column {
@@ -142,7 +142,7 @@ fun ReportScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit)
                     else Paper(padding = 12.dp) {
                         val sorted = d.sum.byCategory.filter { it.amount > 0 }.sortedByDescending { it.amount }
                         Donut(sorted.map { Slice(ctx.cat(it.categoryId)?.name ?: "不明", ctx.cat(it.categoryId)?.color, it.amount) }, "支出", d.sum.expense)
-                        sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount) }
+                        sorted.forEach { a -> CategoryBar(ctx.cat(a.categoryId)?.name ?: "不明", ctx.cat(a.categoryId)?.color, a.amount, sorted.first().amount, ctx.cat(a.categoryId)?.icon, sorted.sumOf { it.amount }) }
                     }
                     if (d.sum.byPayer.isNotEmpty()) {
                         SectionLabel("払った人別")
@@ -180,7 +180,7 @@ fun BudgetRow(ctx: GroupCtx, b: BudgetStatus) {
     val name = (if (b.scope == "personal") ctx.memberName(b.memberId) + "の負担・" else "") + (ctx.cat(b.categoryId)?.name ?: "全体")
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (b.categoryId != null) { CategoryDot(ctx.cat(b.categoryId)?.name, ctx.cat(b.categoryId)?.color, 14.dp); Spacer(Modifier.width(8.dp)) }
+            if (b.categoryId != null) { CategoryDot(ctx.cat(b.categoryId)?.name, ctx.cat(b.categoryId)?.color, 22.dp, ctx.cat(b.categoryId)?.icon); Spacer(Modifier.width(8.dp)) }
             Text(name, Modifier.weight(1f), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Text("${Money.format(b.spent)} / ${Money.format(b.available)}", color = T.sub, fontSize = 14.sp)
         }

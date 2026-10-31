@@ -42,7 +42,7 @@ data class Tokens(
     val accent: Color, val accent2: Color, val accentInk: Color, val danger: Color,
 )
 
-val LightTokens = Tokens(Color(0xFFE9EBEE), Color(0xFFFCFCFA), Color(0xFF16181D), Color(0xFF5B616B), Color(0xFF6F747E), Color(0xFFCDD1D6),
+val LightTokens = Tokens(Color(0xFFE9EBEE), Color(0xFFFCFCFA), Color(0xFF16181D), Color(0xFF5B616B), Color(0xFF646973), Color(0xFFCDD1D6),
     Color(0xFF0E7656), Color(0xFFDCEFE7), Color.White, Color(0xFFB42318))
 val DarkTokens = Tokens(Color(0xFF0E0F11), Color(0xFF1A1B1E), Color(0xFFECEEF1), Color(0xFFA7ACB5), Color(0xFF858B95), Color(0xFF33363C),
     Color(0xFF47C79B), Color(0xFF16302A), Color(0xFF05261B), Color(0xFFFF8A7A))
@@ -98,23 +98,26 @@ fun KeyValue(key: String, value: String, first: Boolean = false, valueColor: Col
     }
 }
 
-// カテゴリの色の丸（色は点・棒・アイコンだけ。文字には使わない）。中は名前の頭の 1 文字
+// カテゴリの色の丸（色は点・棒・アイコンだけ。文字には使わない）。中はカテゴリの絵文字（なければ名前の頭の 1 文字）
 fun parseColor(hex: String?): Color = try { Color(android.graphics.Color.parseColor(hex ?: "#6b7280")) } catch (_: Exception) { Color(0xFF6B7280) }
 
 @Composable
-fun CategoryDot(name: String?, colorHex: String?, size: Dp = 40.dp) {
+fun CategoryDot(name: String?, colorHex: String?, size: Dp = 40.dp, icon: String? = null) {
     Box(Modifier.size(size).clip(CircleShape).background(parseColor(colorHex)), contentAlignment = Alignment.Center) {
-        if (size >= 20.dp) Text((name ?: "?").take(1), color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.42f).sp)
+        if (size >= 20.dp) {
+            if (!icon.isNullOrBlank()) Text(icon, fontSize = (size.value * 0.5f).sp, lineHeight = (size.value * 0.6f).sp)
+            else Text((name ?: "?").take(1), color = Color.White, fontWeight = FontWeight.Bold, fontSize = (size.value * 0.42f).sp)
+        }
     }
 }
 
 // 1 行（カテゴリの丸・題・補足・右に金額）。押せる行は高さ 56dp 以上
 @Composable
-fun ItemRow(title: String, sub: String, amount: String, catName: String?, catColor: String?, amountColor: Color = T.ink, onClick: (() -> Unit)? = null) {
+fun ItemRow(title: String, sub: String, amount: String, catName: String?, catColor: String?, amountColor: Color = T.ink, catIcon: String? = null, onClick: (() -> Unit)? = null) {
     val m = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     Row(Modifier.fillMaxWidth().then(m).heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        CategoryDot(catName, catColor)
+        CategoryDot(catName, catColor, icon = catIcon)
         Column(Modifier.weight(1f)) {
             Text(title, color = T.ink, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(sub, color = T.faint, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -135,12 +138,12 @@ fun Meter(ratio: Float, color: Color = T.accent, tick: Float? = null, modifier: 
     }
 }
 
-// カテゴリの横棒
+// カテゴリの横棒。total を渡すと、全体に占める割合（%）も出す
 @Composable
-fun CategoryBar(name: String, colorHex: String?, amount: Long, max: Long) {
+fun CategoryBar(name: String, colorHex: String?, amount: Long, max: Long, icon: String? = null, total: Long? = null) {
     Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.width(112.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            CategoryDot(name, colorHex, 26.dp)
+            CategoryDot(name, colorHex, 26.dp, icon)
             Text(name, color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         val c = parseColor(colorHex)
@@ -148,6 +151,7 @@ fun CategoryBar(name: String, colorHex: String?, amount: Long, max: Long) {
             val w = size.width * (amount.toFloat() / max.coerceAtLeast(1)).coerceAtLeast(0.015f)
             drawRoundRect(c, size = Size(w, size.height), cornerRadius = CornerRadius(2.dp.toPx()))
         }
+        if (total != null && total > 0) Text("${Math.round(amount * 100.0 / total)}%", color = T.sub, fontSize = 12.sp, style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"))
         Text(jp.kakeibo.share.domain.Money.format(amount), Modifier.widthIn(min = 84.dp), color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp,
             style = MaterialTheme.typography.bodyLarge.copy(fontFeatureSettings = "tnum"), maxLines = 1, softWrap = false)
     }

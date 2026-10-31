@@ -92,7 +92,7 @@ fun CategoryGrid(cats: List<Category>, selected: Category?, onPick: (Category) -
                     Column(Modifier.weight(1f).heightIn(min = 72.dp).clip(RoundedCornerShape(8.dp)).background(if (on) T.accent2 else T.card)
                         .border(if (on) 2.dp else 1.dp, if (on) T.ink else T.line, RoundedCornerShape(8.dp)).clickable { onPick(c) }.padding(vertical = 8.dp, horizontal = 4.dp)
                         .testTag("cat_${c.name}"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        CategoryDot(c.name, c.color, 30.dp)
+                        CategoryDot(c.name, c.color, 30.dp, c.icon)
                         Text(c.name, color = T.ink, fontSize = 12.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
                     }
                 }

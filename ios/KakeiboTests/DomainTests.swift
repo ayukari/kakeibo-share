@@ -163,6 +163,25 @@ final class DomainTests: XCTestCase {
         XCTAssertNil(Savings.emergencyTarget([0, 0]))
     }
 
+    func testInputHintsLearnFromHistory() {
+        func tx(_ id: String, _ cat: String, _ amount: Int64, _ memo: String, _ kind: String = "expense") -> Txn {
+            Txn(id: id, groupId: "g", kind: kind, amount: amount, occurredOn: "2026-10-01", categoryId: cat, payerMemberId: "m", memo: memo)
+        }
+        // 新しい順
+        let h = [tx("1", "food", 480, "コンビニ"), tx("2", "daily", 980, "ドラッグストア"), tx("3", "food", 480, "コンビニ "),
+                 tx("4", "daily", 300, "コンビニ"), tx("5", "food", 1200, "スーパー"), tx("6", "pay", 250000, "給料", "income")]
+        XCTAssertEqual(InputHints.categoryForMemo(h, memo: "　コンビニ", kind: "expense"), "food")
+        XCTAssertEqual(InputHints.categoryForMemo(h, memo: "ドラッグストア", kind: "expense"), "daily")
+        XCTAssertNil(InputHints.categoryForMemo(h, memo: "本屋", kind: "expense"))
+        XCTAssertNil(InputHints.categoryForMemo(h, memo: "給料", kind: "expense"))
+        let cats = [Category(id: "other", groupId: "g", kind: "expense", name: "その他", color: "#000", icon: "🏷️", sort: 99),
+                    Category(id: "daily", groupId: "g", kind: "expense", name: "日用品", color: "#000", icon: "🧺", sort: 2),
+                    Category(id: "food", groupId: "g", kind: "expense", name: "食費", color: "#000", icon: "🍚", sort: 1)]
+        XCTAssertEqual(InputHints.categoryOrder(h, cats).map(.id), ["food", "daily", "other"])
+        XCTAssertEqual(InputHints.recent(h, kind: "expense").map(.id), ["1", "2", "4", "5"])
+        XCTAssertEqual(InputHints.recent(h, kind: "expense", n: 2).map(.id), ["1", "2"])
+    }
+
     func testCoinTiers() {
         XCTAssertEqual([0, 9_999, 10_000, 29_999, 30_000, 100_000, 499_999, 500_000].map { Savings.coinIndex($0) }, [0, 0, 1, 1, 2, 3, 3, 4])
         XCTAssertEqual(Savings.nextCoin(8_000)?.coin.name, "100円玉"); XCTAssertEqual(Savings.nextCoin(8_000)?.left, 2_000)

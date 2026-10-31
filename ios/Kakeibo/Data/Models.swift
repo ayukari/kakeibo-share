@@ -59,13 +59,14 @@ struct Txn: Codable, Identifiable, Hashable {
     var createdAt: String? = nil
     var version: Int = 1
     var recurringId: String? = nil
+    var createdByMember: String? = nil
     var isRefund: Bool? = nil   // 返金（支出だけ。集計と立替では引く）。古いサーバーでは届かない
     var refund: Bool { isRefund ?? false }
     var signed: Int64 { refund ? -amount : amount }
     enum CodingKeys: String, CodingKey {
         case id, kind, amount, memo, visibility, status, version, isRefund = "is_refund"
         case groupId = "group_id", occurredOn = "occurred_on", categoryId = "category_id", payerMemberId = "payer_member_id"
-        case paymentMethodId = "payment_method_id", splitMode = "split_mode", createdBy = "created_by", createdAt = "created_at", recurringId = "recurring_id"
+        case paymentMethodId = "payment_method_id", splitMode = "split_mode", createdBy = "created_by", createdAt = "created_at", recurringId = "recurring_id", createdByMember = "created_by_member"
     }
 }
 

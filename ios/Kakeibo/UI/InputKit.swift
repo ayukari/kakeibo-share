@@ -89,7 +89,7 @@ struct CategoryGrid: View {
                 let on = selected == c.id
                 Button { selected = c.id } label: {
                     VStack(spacing: 4) {
-                        CategoryDot(name: c.name, colorHex: c.color, size: 30)
+                        CategoryDot(name: c.name, colorHex: c.color, size: 30, icon: c.icon)
                         Text(c.name).font(.system(size: 12, weight: on ? .bold : .regular)).foregroundStyle(Color.kInk).lineLimit(1)
                     }.frame(maxWidth: .infinity, minHeight: 72)
                         .background(on ? Color.kAccent2 : Color.kCard, in: RoundedRectangle(cornerRadius: 8))

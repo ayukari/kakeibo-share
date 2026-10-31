@@ -27,6 +27,8 @@ struct TxnListView: View {
         }
         .background(Color.kBg)
         .searchable(text: $query, prompt: "メモ・カテゴリ・人・金額で探す")
+        // タブは 5 つまで（6 つ以上だと iPhone では「その他」にまとめられる）。レポートは「収支」の右上から
+        .toolbar { ToolbarItem(placement: .primaryAction) { NavigationLink { ReportView(ctx: ctx, month: $month) } label: { Label("レポート", systemImage: "chart.bar") } } }
         .task(id: "\(month)-\(ctx.refresh)") { selDay = nil; await load() }
         .refreshable { await load() }
     }
@@ -187,6 +189,30 @@ struct TxnEditView: View {
     @State private var similar: [Txn]? = nil
     @State private var askDelete = false
     @State private var started = false
+    // 入力を速く: 前回のカテゴリと払った人を覚える・メモからカテゴリを推す・最近の入力（docs/research-deep-2026-10-30.md）
+    @State private var history: [Txn] = []
+    @State private var catTouched = false
+    @State private var showAllCats = false
+    @State private var details = false
+
+    private func rememberedCat(_ k: String) -> String? {
+        guard let id = UserDefaults.standard.string(forKey: "kakeibo.input.cat.\(ctx.g).\(k)"), let c = ctx.cat(id), c.archivedAt == nil else { return nil }
+        return c.id
+    }
+    private var orderedCats: [Category] {
+        InputHints.categoryOrder(history, ctx.cats.filter { $0.kind == kind && ($0.archivedAt == nil || $0.id == txn?.categoryId) })
+    }
+    private var summary: String {
+        var parts: [String] = []
+        if let p = ctx.members.first(where: { $0.id == payerId }) { parts.append(p.displayName + (kind == "income" || isRefund ? "が受け取った" : "が払った")) }
+        if let pm = ctx.pms.first(where: { $0.id == pmId }) { parts.append(pm.name) }
+        if isRefund { parts.append("返金") }
+        if isPrivate { parts.append("自分だけ") }
+        if kind == "expense" && !isPrivate {
+            switch split { case "equal": parts.append("均等に割り勘"); case "ratio": parts.append("割合で割り勘"); case "custom": parts.append("金額で割り勘"); default: break }
+        }
+        return parts.joined(separator: "・")
+    }
 
     private var splitMembers: [Member] { ctx.members.filter { $0.status == "active" || equal.contains($0.id) || custom[$0.id] != nil } }
 
@@ -196,28 +222,67 @@ struct TxnEditView: View {
                 VStack(spacing: 10) {
                     Segmented(options: ["支出", "収入"], selected: Binding(get: { kind == "expense" ? 0 : 1 }, set: { kind = $0 == 0 ? "expense" : "income" }))
                     DateStepper(date: $date)
+                    let recents = txn == nil ? InputHints.recent(history, kind: kind) : []
+                    if !recents.isEmpty {
+                        // 最近の入力: 押すと金額・カテゴリ・メモをまとめて入れる（日付は今のまま）
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(recents) { t in
+                                    let c = ctx.cat(t.categoryId)
+                                    Button {
+                                        amount = String(t.amount); catId = t.categoryId; memo = t.memo; catTouched = true; amountError = nil
+                                    } label: {
+                                        Text("\(c?.icon ?? "") \(Money.format(t.amount)) \(t.memo.isEmpty ? (c?.name ?? "") : t.memo)")
+                                            .font(.system(size: 14)).foregroundStyle(Color.kInk).lineLimit(1)
+                                            .padding(.horizontal, 10).frame(minHeight: 40)
+                                            .background(Color.kCard, in: buttonShape).overlay(buttonShape.stroke(Color.kLine, lineWidth: 1))
+                                    }.buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    }
                     AmountDisplay(expr: amount, error: amountError)
                     CalcKeypad { k in amount = Calc.press(amount, k); amountError = nil }
                 }.listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
-                    .onChange(of: kind) { if ctx.cat(catId)?.kind != kind { catId = nil } }
-            }
-            Section("カテゴリ") {
-                CategoryGrid(cats: ctx.cats.filter { $0.kind == kind && ($0.archivedAt == nil || $0.id == txn?.categoryId) }, selected: $catId)
-                    .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+                    .onChange(of: kind) { if ctx.cat(catId)?.kind != kind { catId = txn == nil ? rememberedCat(kind) : nil } }
             }
             Section {
-                if kind == "expense" { Toggle("返金（払い戻し・返品で戻ってきたお金。支出と立替から引きます）", isOn: $isRefund) }
-                Picker(kind == "income" || isRefund ? "受け取った人" : "払った人", selection: $payerId) {
-                    ForEach(ctx.members.filter { $0.status == "active" || $0.id == txn?.payerMemberId }) { Text($0.displayName).tag(Optional($0.id)) }
+                let all = orderedCats
+                let shown = showAllCats || all.count <= 8 ? all : Array(all.prefix(8)) + all.dropFirst(8).filter { $0.id == catId }
+                CategoryGrid(cats: shown, selected: Binding(get: { catId }, set: { catId = $0; catTouched = true }))
+                    .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+            } header: {
+                HStack {
+                    Text("カテゴリ")
+                    Spacer()
+                    if orderedCats.count > 8 { Button(showAllCats ? "よく使うものだけ" : "すべて（\(orderedCats.count)）") { showAllCats.toggle() }.font(.caption) }
                 }
-                Picker("支払い方法（任意）", selection: $pmId) {
-                    Text("なし").tag(String?.none)
-                    ForEach(ctx.pms.filter { $0.archivedAt == nil || $0.id == txn?.paymentMethodId }) { Text($0.name).tag(Optional($0.id)) }
-                }
-                TextField("メモ（任意）", text: $memo, axis: .vertical)
-                Toggle("自分だけに見せる（グループの集計と精算には入りません）", isOn: $isPrivate)
             }
-            if kind == "expense" && !isPrivate {
+            Section {
+                TextField("メモ（任意）", text: $memo)
+                    .onChange(of: memo) {
+                        // 前に同じメモで使ったカテゴリを選んでおく（自分でカテゴリを選んだあとは変えない）
+                        if !catTouched, let id = InputHints.categoryForMemo(history, memo: memo, kind: kind), let c = ctx.cat(id), c.archivedAt == nil { catId = c.id }
+                    }
+                // くわしく: 払った人・支払い方法・返金・自分だけ（ふだんは閉じておき、決めた内容を 1 行で見せる）
+                DisclosureGroup(isExpanded: $details) {
+                    if kind == "expense" { Toggle("返金（払い戻し・返品で戻ってきたお金。支出と立替から引きます）", isOn: $isRefund) }
+                    Picker(kind == "income" || isRefund ? "受け取った人" : "払った人", selection: $payerId) {
+                        ForEach(ctx.members.filter { $0.status == "active" || $0.id == txn?.payerMemberId }) { Text($0.displayName).tag(Optional($0.id)) }
+                    }
+                    Picker("支払い方法（任意）", selection: $pmId) {
+                        Text("なし").tag(String?.none)
+                        ForEach(ctx.pms.filter { $0.archivedAt == nil || $0.id == txn?.paymentMethodId }) { Text($0.name).tag(Optional($0.id)) }
+                    }
+                    Toggle("自分だけに見せる（グループの集計と精算には入りません）", isOn: $isPrivate)
+                } label: {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("くわしく").bold()
+                        Text(summary).font(.caption).foregroundStyle(Color.kSub).lineLimit(1)
+                    }
+                }
+            }
+            if details && kind == "expense" && !isPrivate {
                 Section("割り勘") {
                     Picker("割り勘", selection: $split) { Text("しない").tag("none"); Text("均等").tag("equal"); Text("割合").tag("ratio"); Text("金額").tag("custom") }.pickerStyle(.segmented)
                     let a = Calc.evaluate(amount) ?? 0
@@ -252,12 +317,18 @@ struct TxnEditView: View {
                     }
                 }
             }
-            if let error { Text(error).foregroundStyle(.red).accessibilityIdentifier("txnError") }
-            Section {
-                Button { trySave() } label: { HStack { Spacer(); if busy { ProgressView() } else { Text(kind == "income" ? "収入を記録する" : (isRefund ? "返金を記録する" : "支出を記録する")).bold() }; Spacer() }.frame(minHeight: 44) }
-                    .disabled(busy).accessibilityIdentifier("save")
-                if txn != nil { Button("この記録を消す", role: .destructive) { askDelete = true }.disabled(busy) }
+            if txn != nil { Section { Button("この記録を消す", role: .destructive) { askDelete = true }.disabled(busy) } }
+        }
+        .safeAreaInset(edge: .bottom) {
+            // 下に固定: 誤りの知らせと保存ボタン（スクロールしなくても押せる）
+            VStack(spacing: 6) {
+                if let error { Text(error).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading).accessibilityIdentifier("txnError") }
+                Button { trySave() } label: {
+                    HStack { Spacer(); if busy { ProgressView() } else { Text(kind == "income" ? "収入を記録する" : (isRefund ? "返金を記録する" : "支出を記録する")).bold().foregroundStyle(Color.kAccentInk) }; Spacer() }
+                        .frame(minHeight: 52).background(Color.kAccent, in: buttonShape)
+                }.buttonStyle(.plain).disabled(busy).accessibilityIdentifier("save")
             }
+            .padding(.horizontal, 16).padding(.vertical, 8).background(Color.kBg)
         }
         .navigationTitle(txn == nil ? "記録する" : "取引の編集")
         .toolbar { if txn == nil { ToolbarItem(placement: .cancellationAction) { Button("やめる") { dismiss() } } } }
@@ -266,7 +337,7 @@ struct TxnEditView: View {
             Button("それでも保存") { similar = nil; if let t = input() { save(t) } }
             Button("やめる", role: .cancel) { similar = nil }
         } message: {
-            Text("同じ日・同じ金額・同じカテゴリの記録が \(similar?.count ?? 0) 件あります。二重に入れていないか確かめてください。")
+            Text("同じ日・同じ金額の記録が \(similar?.count ?? 0) 件あります。" + (similar ?? []).prefix(3).map { "\n・\(ctx.memberName($0.createdByMember ?? $0.payerMemberId))が記録: \(Money.format($0.amount)) \(ctx.cat($0.categoryId)?.name ?? "") \($0.memo)" }.joined() + "\n二重に入れていないか確かめてください。")
         }
         .confirmationDialog("記録を消しますか", isPresented: $askDelete, titleVisibility: .visible) {
             Button("消す", role: .destructive) { remove() }
@@ -278,9 +349,17 @@ struct TxnEditView: View {
         started = true
         let act = ctx.activeMembers
         for (i, m) in act.enumerated() { ratio[m.id] = String(100 / max(1, act.count) + (i < 100 % max(1, act.count) ? 1 : 0)) }
-        guard let t = txn else { payerId = ctx.me?.id; equal = Set(act.map(\.id)); if let d = initialDate { date = d }; return }
+        guard let t = txn else {
+            payerId = ctx.me?.id; equal = Set(act.map(\.id)); if let d = initialDate { date = d }
+            catId = rememberedCat(kind)
+            if let pid = UserDefaults.standard.string(forKey: "kakeibo.input.payer.\(ctx.g)"), act.contains(where: { $0.id == pid }) { payerId = pid }
+            history = (try? await ctx.repo.recentTransactions(ctx.g, limit: 300)) ?? []
+            return
+        }
+        catTouched = true
         kind = t.kind; amount = String(t.amount); date = Money.date(t.occurredOn) ?? date; catId = t.categoryId; payerId = t.payerMemberId
         pmId = t.paymentMethodId; memo = t.memo; isPrivate = t.visibility == "private"; isRefund = t.refund; split = t.splitMode
+        details = t.paymentMethodId != nil || isPrivate || isRefund || t.splitMode != "none" || t.payerMemberId != ctx.me?.id
         if t.splitMode != "none" {
             splitsLoaded = false
             do {
@@ -327,6 +406,10 @@ struct TxnEditView: View {
         Task { @MainActor in
             do {
                 _ = try await ctx.repo.saveTransaction(ctx.g, t)
+                if txn == nil {
+                    UserDefaults.standard.set(t.categoryId, forKey: "kakeibo.input.cat.\(ctx.g).\(t.kind)")
+                    UserDefaults.standard.set(t.payerMemberId, forKey: "kakeibo.input.payer.\(ctx.g)")
+                }
                 ctx.app.toast = txn == nil ? "保存しました" : "変更を保存しました"
                 ctx.refresh += 1
                 dismiss()

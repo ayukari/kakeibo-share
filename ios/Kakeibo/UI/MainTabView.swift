@@ -52,7 +52,6 @@ struct MainTabView: View {
                     nav { TxnListView(ctx: ctx, month: $month) }.tabItem { Label("収支", systemImage: "list.bullet") }
                     nav { SavingsView(ctx: ctx) }.tabItem { Label("貯金", systemImage: "envelope") }
                     nav { SettlementView(ctx: ctx) }.tabItem { Label("精算", systemImage: "arrow.left.arrow.right") }
-                    nav { ReportView(ctx: ctx, month: $month) }.tabItem { Label("レポート", systemImage: "chart.bar") }
                     nav { MoreView(ctx: ctx, month: month) }.tabItem { Label("その他", systemImage: "ellipsis") }
                 }
                 .tint(Color.kAccent)
@@ -142,7 +141,7 @@ struct DashboardContent: View {
                 SectionLabel(text: "カテゴリ")
                 Paper(padding: 12) {
                     let sorted = d.sum.byCategory.filter { $0.amount > 0 }.sorted { $0.amount > $1.amount }
-                    ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.cat(a.categoryId)?.name ?? "不明", colorHex: ctx.cat(a.categoryId)?.color, amount: a.amount, max: sorted[0].amount) }
+                    ForEach(sorted, id: \.self) { a in CategoryBar(name: ctx.cat(a.categoryId)?.name ?? "不明", colorHex: ctx.cat(a.categoryId)?.color, amount: a.amount, max: sorted[0].amount, icon: ctx.cat(a.categoryId)?.icon, total: sorted.reduce(0) { $0 + $1.amount }) }
                 }
             }
             SectionLabel(text: "最近の記録")
@@ -254,7 +253,7 @@ struct BudgetRow: View {
         let name = (b.scope == "personal" ? ctx.memberName(b.memberId) + "の負担・" : "") + (ctx.cat(b.categoryId)?.name ?? "全体")
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                if b.categoryId != nil { CategoryDot(name: name, colorHex: ctx.cat(b.categoryId)?.color, size: 14) }
+                if b.categoryId != nil { CategoryDot(name: name, colorHex: ctx.cat(b.categoryId)?.color, size: 22, icon: ctx.cat(b.categoryId)?.icon) }
                 Text(name).font(.system(size: 14, weight: .bold)).foregroundStyle(Color.kInk)
                 Spacer()
                 Text("\(Money.format(b.spent)) / \(Money.format(b.available))").font(.system(size: 14)).monospacedDigit().foregroundStyle(Color.kSub)
@@ -278,7 +277,7 @@ struct TxnRow: View {
         let who: String = ctx.memberName(t.payerMemberId) + (t.refund ? "が受け取った返金" : "が払った")
         let tags: String = (t.splitMode != "none" ? "・割り勘" : "") + (t.visibility == "private" ? "・自分だけ" : "")
         let sub = "\(t.occurredOn.dropFirst(5).replacingOccurrences(of: "-", with: "/"))・\(who)\(tags)"
-        ItemRow(title: (c?.name ?? "不明") + (t.memo.isEmpty ? "" : "・\(t.memo)"), sub: sub, amount: (t.kind == "income" || t.refund ? "+" : "") + Money.format(t.amount), catName: c?.name, catColor: c?.color)
+        ItemRow(title: (c?.name ?? "不明") + (t.memo.isEmpty ? "" : "・\(t.memo)"), sub: sub, amount: (t.kind == "income" || t.refund ? "+" : "") + Money.format(t.amount), catName: c?.name, catColor: c?.color, catIcon: c?.icon)
     }
 }
 

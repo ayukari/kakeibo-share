@@ -55,7 +55,7 @@ fun CategoryScreen(ctx: GroupCtx) {
                         listOf("expense" to "支出", "income" to "収入").forEach { (k, l) ->
                             SectionTitle(l)
                             cs.filter { it.kind == k && it.archivedAt == null }.forEach { c ->
-                                ListItem(headlineContent = { Text(c.name, fontWeight = FontWeight.Bold) }, leadingContent = { CategoryDot(c.name, c.color) }, modifier = Modifier.clickable(enabled = admin) { edit = c },
+                                ListItem(headlineContent = { Text(c.name, fontWeight = FontWeight.Bold) }, leadingContent = { CategoryDot(c.name, c.color, icon = c.icon) }, modifier = Modifier.clickable(enabled = admin) { edit = c },
                                     trailingContent = { if (admin) TextButton({ del = c }) { Text("消す", color = OverColor) } })
                             }
                             if (admin) TextButton({ creating = k }, enabled = !busy) { Text("＋ ${l}のカテゴリを足す") }

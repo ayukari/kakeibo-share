@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.lerp
@@ -23,6 +24,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import jp.kakeibo.share.domain.Calc
+import jp.kakeibo.share.domain.InputHints
 import jp.kakeibo.share.domain.Insights
 import java.time.YearMonth
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,10 +49,19 @@ fun TxnListScreen(ctx: GroupCtx, month: LocalDate, setMonth: (LocalDate) -> Unit
     var q by remember { mutableStateOf("") }
     var sort by remember { mutableStateOf("new") }
     var selDay by remember(month) { mutableStateOf<Int?>(null) }
+    // タブは 5 つまで（先人調査）。レポートは「収支」の 3 つ目の切り替えにまとめる
+    val modes = listOf("リスト", "カレンダー", "レポート")
+    if (mode == 2) {
+        ReportScreen(ctx, month, setMonth) {
+            item { MonthBar(month, setMonth) }
+            item { Segmented(modes, mode, { mode = it }, Modifier.padding(vertical = 8.dp)) }
+        }
+        return
+    }
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 112.dp)) {
         item { MonthBar(month, setMonth) }
-        item { Segmented(listOf("リスト", "カレンダー"), mode, { mode = it }, Modifier.padding(vertical = 8.dp)) }
+        item { Segmented(modes, mode, { mode = it }, Modifier.padding(vertical = 8.dp)) }
         if (mode == 1) {
             item {
                 LoadableView(st, { vm.reload() }) { all ->
@@ -170,7 +181,21 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
     var busy by remember { mutableStateOf(false) }
     var similar by remember { mutableStateOf<List<Txn>?>(null) }
     var askDelete by remember { mutableStateOf(false) }
+    // 入力を速く: 前回のカテゴリと払った人を覚える・メモからカテゴリを推す・最近の入力（docs/research-deep-2026-10-30.md）
+    val prefs = androidx.compose.ui.platform.LocalContext.current.getSharedPreferences("kakeibo_input", android.content.Context.MODE_PRIVATE)
+    var catTouched by remember { mutableStateOf(txn != null) }
+    var history by remember { mutableStateOf<List<Txn>>(emptyList()) }
+    var showAllCats by remember { mutableStateOf(false) }
+    var details by remember { mutableStateOf(txn != null && (txn.paymentMethodId != null || txn.visibility == "private" || txn.isRefund || txn.splitMode != "none" || txn.payerMemberId != ctx.me?.id)) }
+    fun rememberedCat(k: String) = ctx.cats.firstOrNull { it.id == prefs.getString("cat_${ctx.g.id}_$k", null) && it.archivedAt == null }
 
+    LaunchedEffect(Unit) {
+        if (txn == null) {
+            rememberedCat(kind)?.let { cat = it }
+            ctx.activeMembers.firstOrNull { it.id == prefs.getString("payer_${ctx.g.id}", null) }?.let { payer = it }
+        }
+        history = try { ctx.repo.recentTransactions(ctx.g.id, 300) } catch (_: AppError) { emptyList() }
+    }
     LaunchedEffect(txn?.id) {
         val act = ctx.activeMembers.ifEmpty { ctx.members.take(1) }
         if (act.isNotEmpty()) act.forEachIndexed { i, m -> ratio[m.id] = (100 / act.size + if (i < 100 % act.size) 1 else 0).toString() }
@@ -181,8 +206,9 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
             loadedSplits = true
         } catch (e: AppError) { error = "割り勘の内訳を読めませんでした: ${e.userMessage}" }
     }
-    val cats = ctx.cats.filter { it.kind == kind && (it.archivedAt == null || it.id == txn?.categoryId) }
-    if (cat?.kind != kind) cat = null
+    val cats = InputHints.categoryOrder(history, ctx.cats.filter { it.kind == kind && (it.archivedAt == null || it.id == txn?.categoryId) })
+    if (cat?.kind != kind) cat = if (txn == null) rememberedCat(kind) else null
+    val recents = if (txn == null) InputHints.recent(history, kind) else emptyList()
     val splitMembers = ctx.members.filter { it.status == "active" || it.id in equal || custom.containsKey(it.id) }
 
     fun input(): TxnInput? {
@@ -202,7 +228,11 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
             isRefund = kind == "expense" && refund)
     }
     fun save(t: TxnInput) { busy = true; scope.launch {
-        try { ctx.repo.saveTransaction(ctx.g.id, t); onSaved(if (txn == null) "保存しました" else "変更を保存しました") }
+        try {
+            ctx.repo.saveTransaction(ctx.g.id, t)
+            if (txn == null) prefs.edit().putString("cat_${ctx.g.id}_${t.kind}", t.categoryId).putString("payer_${ctx.g.id}", t.payerMemberId).apply()
+            onSaved(if (txn == null) "保存しました" else "変更を保存しました")
+        }
         catch (e: AppError) { error = e.userMessage } finally { busy = false }
     } }
     fun trySave() {
@@ -215,20 +245,57 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
         }
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxSize().imePadding()) {
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Segmented(listOf("支出", "収入"), if (kind == "expense") 0 else 1, { kind = if (it == 0) "expense" else "income" })
         DateStepper(date, { date = it })
+        if (recents.isNotEmpty()) {
+            // 最近の入力: 押すと金額・カテゴリ・メモをまとめて入れる（日付は今のまま）
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("recents"), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                recents.forEach { t ->
+                    val c = ctx.cat(t.categoryId)
+                    Row(Modifier.clip(ButtonShape).border(1.dp, T.line, ButtonShape).background(T.card)
+                        .clickable { amount = t.amount.toString(); cat = c; memo = t.memo; catTouched = true; amountErr = null }
+                        .heightIn(min = 40.dp).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text((c?.icon ?: "") + " " + Money.format(t.amount) + " " + t.memo.ifBlank { c?.name ?: "" }, color = T.ink, fontSize = 14.sp, maxLines = 1)
+                    }
+                }
+            }
+        }
         AmountDisplay(amount, amountErr)
         CalcKeypad { key -> amount = Calc.press(amount, key); amountErr = null }
-        Label("カテゴリ")
-        CategoryGrid(cats, cat) { cat = it }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Label("カテゴリ")
+            Spacer(Modifier.weight(1f))
+            if (cats.size > 8) TextButton({ showAllCats = !showAllCats }) { Text(if (showAllCats) "よく使うものだけ" else "すべて（${cats.size}）", color = T.sub) }
+        }
+        val shown = if (showAllCats || cats.size <= 8) cats else (cats.take(8) + listOfNotNull(cat).filter { it !in cats.take(8) })
+        CategoryGrid(shown, cat) { cat = it; catTouched = true }
+        OutlinedTextField(memo, { v ->
+            memo = v.take(500)
+            // 前に同じメモで使ったカテゴリを選んでおく（自分でカテゴリを選んだあとは変えない）
+            if (!catTouched) InputHints.categoryForMemo(history, memo, kind)?.let { id -> ctx.cat(id)?.takeIf { it.archivedAt == null }?.let { cat = it } }
+        }, Modifier.fillMaxWidth().testTag("memo"), label = { Text("メモ（任意）") }, singleLine = true)
+        // くわしく: 払った人・支払い方法・返金・自分だけ・割り勘（ふだんは閉じておき、決めた内容を 1 行で見せる）
+        val summary = listOfNotNull(
+            payer?.let { (it.displayName + if (kind == "income" || refund) "が受け取った" else "が払った") },
+            pm?.name, if (refund) "返金" else null, if (private) "自分だけ" else null,
+            when { kind == "income" || private -> null; split == "equal" -> "均等に割り勘"; split == "ratio" -> "割合で割り勘"; split == "custom" -> "金額で割り勘"; else -> null },
+        ).joinToString("・")
+        Row(Modifier.fillMaxWidth().clip(ButtonShape).clickable { details = !details }.heightIn(min = 48.dp).padding(horizontal = 4.dp).testTag("details"), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("くわしく", color = T.ink, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(summary, color = T.sub, fontSize = 12.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            Text(if (details) "閉じる" else "開く", color = T.sub, fontSize = 14.sp)
+        }
+        if (details) {
         if (kind == "expense") Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(refund, { refund = it }, Modifier.testTag("refund"))
             Text("返金（払い戻し・返品で戻ってきたお金。支出と立替から引きます）", Modifier.padding(start = 8.dp), color = T.ink, fontSize = 14.sp)
         }
         Picker(if (kind == "income" || refund) "受け取った人" else "払った人", ctx.members.filter { it.status == "active" || it.id == txn?.payerMemberId }, payer, { it.displayName }, { payer = it })
         Picker("支払い方法（任意）", listOf<PaymentMethod?>(null) + ctx.pms.filter { it.archivedAt == null || it.id == txn?.paymentMethodId }, pm, { it?.name ?: "なし" }, { pm = it })
-        OutlinedTextField(memo, { memo = it.take(500) }, Modifier.fillMaxWidth(), label = { Text("メモ（任意）") })
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(private, { private = it })
             Text("自分だけに見せる（グループの集計と精算には入りません）", Modifier.padding(start = 8.dp), color = T.ink, fontSize = 14.sp)
@@ -271,15 +338,20 @@ fun TxnEditScreen(ctx: GroupCtx, txn: Txn?, initialKind: String, initialDate: Lo
                 }
             }
         }
+        }   // くわしく
+        if (txn != null) OutlinedButton({ askDelete = true }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !busy, shape = ButtonShape) { Text("この記録を消す", color = MaterialTheme.colorScheme.error) }
+    }
+    // 下に固定: 誤りの知らせと保存ボタン（スクロールしなくても押せる）
+    Column(Modifier.fillMaxWidth().background(T.bg).padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("txnError")) }
         Button(::trySave, Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("save"), enabled = !busy, shape = ButtonShape) {
             if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Text(if (kind == "income") "収入を記録する" else if (refund) "返金を記録する" else "支出を記録する", fontWeight = FontWeight.Bold)
         }
-        if (txn != null) OutlinedButton({ askDelete = true }, Modifier.fillMaxWidth().heightIn(min = 48.dp), enabled = !busy, shape = ButtonShape) { Text("この記録を消す", color = MaterialTheme.colorScheme.error) }
+    }
     }
 
     similar?.let { s ->
-        ConfirmDialog("似た記録があります", "同じ日・同じ金額・同じカテゴリの記録が ${s.size} 件あります。\n" + s.take(3).joinToString("\n") { "・${it.occurredOn} ${Money.format(it.amount)} ${it.memo}" } + "\n二重に入れていないか確かめてください。",
+        ConfirmDialog("似た記録があります", "同じ日・同じ金額の記録が ${s.size} 件あります。\n" + s.take(3).joinToString("\n") { "・${ctx.memberName(it.createdByMember ?: it.payerMemberId)}が記録: ${it.occurredOn} ${Money.format(it.amount)} ${ctx.cat(it.categoryId)?.name ?: ""} ${it.memo}" } + "\n二重に入れていないか確かめてください。",
             "それでも保存", onConfirm = { similar = null; input()?.let(::save) }, onDismiss = { similar = null }, danger = false)
     }
     if (askDelete && txn != null) ConfirmDialog("記録を消しますか", "${txn.occurredOn} ${Money.format(txn.amount)} を消します。操作の履歴には残ります。", "消す",

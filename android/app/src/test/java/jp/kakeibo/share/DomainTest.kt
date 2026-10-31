@@ -1,5 +1,6 @@
 package jp.kakeibo.share
 
+import jp.kakeibo.share.data.Category
 import jp.kakeibo.share.data.Split
 import jp.kakeibo.share.data.Txn
 import jp.kakeibo.share.domain.AppError
@@ -8,6 +9,7 @@ import jp.kakeibo.share.domain.Money
 import jp.kakeibo.share.domain.Validate
 import jp.kakeibo.share.domain.Calc
 import jp.kakeibo.share.domain.Insights
+import jp.kakeibo.share.domain.InputHints
 import jp.kakeibo.share.domain.Savings
 import jp.kakeibo.share.data.*
 import jp.kakeibo.share.ui.Csv
@@ -148,6 +150,24 @@ class DomainTest {
         assertEquals(110000L to 330000L, Savings.emergencyTarget(listOf(0, 100000, 120000, 110000)))
         assertEquals(97000L to 300000L, Savings.emergencyTarget(listOf(97000)))
         assertNull(Savings.emergencyTarget(listOf(0, 0)))
+    }
+
+    @Test fun inputHintsLearnFromHistory() {
+        fun tx(id: String, cat: String, amount: Long, memo: String, kind: String = "expense") = Txn(id, "g", kind, amount, "2026-10-01", cat, "m", memo = memo)
+        // 新しい順
+        val h = listOf(tx("1", "food", 480, "コンビニ"), tx("2", "daily", 980, "ドラッグストア"), tx("3", "food", 480, "コンビニ "),
+            tx("4", "daily", 300, "コンビニ"), tx("5", "food", 1200, "スーパー"), tx("6", "pay", 250000, "給料", "income"))
+        // 同じメモ（表記ゆれ込み）でいちばん多いカテゴリ
+        assertEquals("food", InputHints.categoryForMemo(h, "　コンビニ", "expense"))
+        assertEquals("daily", InputHints.categoryForMemo(h, "ドラッグストア", "expense"))
+        assertNull(InputHints.categoryForMemo(h, "本屋", "expense"))
+        assertNull(InputHints.categoryForMemo(h, "給料", "expense"))   // 種類が違う
+        // よく使う順（food 3 件 > daily 2 件 > 使っていないもの）
+        val cats = listOf(Category("other", "g", "expense", "その他", "#000", "🏷️", 99), Category("daily", "g", "expense", "日用品", "#000", "🧺", 2), Category("food", "g", "expense", "食費", "#000", "🍚", 1))
+        assertEquals(listOf("food", "daily", "other"), InputHints.categoryOrder(h, cats).map { it.id })
+        // 最近の入力: 同じカテゴリ・金額・メモは 1 つに
+        assertEquals(listOf("1", "2", "4", "5"), InputHints.recent(h, "expense").map { it.id })
+        assertEquals(listOf("1", "2"), InputHints.recent(h, "expense", 2).map { it.id })
     }
 
     @Test fun coinTiers() {
