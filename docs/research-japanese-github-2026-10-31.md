@@ -222,7 +222,7 @@ Next.js + Convex の Web アプリ（PWA）。2 人用、Stripe の有料プラ�
 ## 調べ方と分担
 
 - 4 つの調査（家計簿リポジトリ／割り勘・共有・お小遣い／日本向けの部品／Qiita・Zenn・note の開発記）を同時に進め、早く終わったものには追加の調査（未確認の点、締め日、高齢の家族向けなど）を頼んだ。Bonsai には任せていない（Web の文脈が要り、確かめる方が高くつくため）。
-- 取りまとめのときに一次資料で確かめたもの: うちの `equal_split`・`recur_freq`・`budgets`・並び順、tapreceipt の祝日の計算と holiday_jp の突き合わせ（2000〜2050 年）、pairbo の `calculateEqualSplit` と issue の一覧、mf-dashboard の固定費の定数、KakeiMatch の突き合わせの決まり、kakeflow の Vpass の列、home-pocket-app の店名辞書の件数（10 ファイルで 391 件）、PayPay の CSV の列（公式）、TatekaeMaru の LINE 共有（`setPackage("jp.naver.line.android")` と `ActivityNotFoundException` で普通の共有へ）、LINE の料金（公式）、内閣府の祝日 CSV、supabase-kt の `signInWith(IDToken)`、`JapaneseEra.REIWA` が API 30 から。
+- 取りまとめのときに一次資料で確かめたもの: うちの `equal_split`・`recur_freq`・`budgets`・並び順、tapreceipt の祝日の計算と holiday_jp の突き合わせ（2000〜2050 年）、pairbo の `calculateEqualSplit` と issue の一覧、mf-dashboard の固定費の定数、KakeiMatch の突き合わせの決まり、kakeflow の Vpass の列、home-pocket-app の店名辞書の件数（10 ファイルで 391 件）、duo-pocketbook の精算の式（`docs/settlement.md`、1 円未満は四捨五入）、okanjo の「全部足してから 1 回だけ丸める」（`repayments_calculator.rb` の `round_charges`、Rational で持つ）、sanataro の `credit_due_date`（締め日を過ぎたら 1 か月あと、99 は月末。祝日でずらさず、31 日のない月の扱いもない）、PayPay の CSV の列（公式）、TatekaeMaru の LINE 共有（`setPackage("jp.naver.line.android")` と `ActivityNotFoundException` で普通の共有へ）、LINE の料金（公式）、内閣府の祝日 CSV、supabase-kt の `signInWith(IDToken)`、`JapaneseEra.REIWA` が API 30 から。
 - それ以外の行番号や件数は調査担当の報告による。使う前にその場で確かめる。
 
 ## 主な記事（2026-10-31 に開けることを確認）
